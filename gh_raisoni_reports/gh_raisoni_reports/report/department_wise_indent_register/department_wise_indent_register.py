@@ -178,6 +178,10 @@
 
 #     return final_data
 
+
+
+
+
 import frappe
 
 
@@ -267,6 +271,12 @@ def get_data(filters):
     conditions=[]
     values={}
 
+    # show submitted but exclude rejected/cancelled
+    conditions.append("mr.docstatus=1")
+    conditions.append("IFNULL(mr.status,'')!='Rejected'")
+    conditions.append("IFNULL(mr.status,'')!='Cancelled'")
+
+
     if filters.get("from_date") and filters.get("to_date"):
         conditions.append(
             "mr.transaction_date BETWEEN %(from_date)s AND %(to_date)s"
@@ -329,9 +339,11 @@ def get_data(filters):
         INNER JOIN `tabMaterial Request Item` mri
         ON mr.name=mri.parent
 
-        WHERE 1=1 {condition_str}
+        WHERE 1=1
+        {condition_str}
 
         ORDER BY mr.transaction_date DESC
+
     """,values,as_dict=1)
 
 
@@ -365,7 +377,6 @@ def get_data(filters):
         level1=""
         level2=""
         level3=""
-
 
         logs=frappe.get_all(
             "Material Request Activity",

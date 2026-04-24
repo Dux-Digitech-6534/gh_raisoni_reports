@@ -111,7 +111,7 @@ def execute(filters=None):
 def get_columns():
     return [
         {
-            "label": "Stock Entry",
+            "label": "Material Issue ID",
             "fieldname": "name",
             "fieldtype": "Link",
             "options": "Stock Entry",
@@ -137,12 +137,7 @@ def get_columns():
             "options": "Item",
             "width": 150
         },
-        {
-            "label": "Item Name",
-            "fieldname": "item_name",
-            "fieldtype": "Data",
-            "width": 180
-        },
+       
         {
             "label": "Qty",
             "fieldname": "qty",

@@ -20,11 +20,11 @@ frappe.query_reports["Department Wise Indent Register New"] = {
             "fieldtype":"Link",
             "options":"Company"
         },
-        {
-            "fieldname": "custom_department",
-            "label": "User Department",
-            "fieldtype": "Link",
-            "options": "Department"
+       {
+            fieldname: "custom_department",
+            label: "User Department",
+            fieldtype: "Link",
+            options: "Department"
         },
         
         {

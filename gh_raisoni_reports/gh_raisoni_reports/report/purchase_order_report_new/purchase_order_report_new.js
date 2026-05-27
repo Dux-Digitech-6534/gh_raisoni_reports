@@ -85,14 +85,7 @@ frappe.query_reports["Purchase Order Report New"] = {
 	onload: function (report) {
 		report._po_selected = {};
 		report._po_poll_timer = null;
-		report.page.add_inner_button(__("Excel Without Detail"), function () {
-			   frappe.query_report.export_report();
-				});
-
-		report.page.add_inner_button(__("PDF Without Detail"), function () {
-			frappe.query_report.print_report();
-		});
-
+		
 		po_add_styles();
 
 		report._dp_btn = report.page
@@ -555,8 +548,8 @@ function po_open_detail_tab(items, po_names) {
 						'<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">' +
 						'<input id="filter-item" placeholder="Item Name" oninput="filterDetailTable()">' +
 						'<div></div>' +
-						'<button onclick="window.print()">PDF With Detail</button>' +
-						'<button onclick="downloadExcel()">Excel With Detail<</button>' +
+						'<button onclick="window.print()">PDF</button>' +
+						'<button onclick="downloadExcel()">Excel</button>' +
 					'</div>' +
 
 					'<div class="table-wrap">' +

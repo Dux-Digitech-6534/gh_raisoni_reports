@@ -42,10 +42,11 @@ frappe.query_reports["Purchase Order Report New"] = {
 		options.checkboxColumn = true;
 		return options;
 	},
-
+    
 	formatter: function (value, row, column, data, default_formatter) {
-		value = default_formatter(value, row, column, data);
 
+		value = default_formatter(value, row, column, data);
+        
 		if (column.fieldname === "workflow_state" && data && data.workflow_state) {
 			var map = {
 				"Cancelled": { bg: "#fde8e8", color: "#c0392b" },
@@ -66,6 +67,17 @@ frappe.query_reports["Purchase Order Report New"] = {
 				+ po_esc(data.workflow_state) +
 			'</span>';
 		}
+		if (column.fieldname === "material_request" && data && data.material_request) {
+			var mr_list = String(data.material_request).split(",").map(function (mr) {
+				return mr.trim();
+			}).filter(Boolean);
+
+			return mr_list.map(function (mr) {
+				return '<a href="/app/material-request/' + encodeURIComponent(mr) + '" target="_blank">' +
+					po_esc(mr) +
+				'</a>';
+			}).join(", ");
+		}
 
 		return value;
 	},
@@ -73,6 +85,13 @@ frappe.query_reports["Purchase Order Report New"] = {
 	onload: function (report) {
 		report._po_selected = {};
 		report._po_poll_timer = null;
+		report.page.add_inner_button(__("Excel Without Detail"), function () {
+			   frappe.query_report.export_report();
+				});
+
+		report.page.add_inner_button(__("PDF Without Detail"), function () {
+			frappe.query_report.print_report();
+		});
 
 		po_add_styles();
 
@@ -90,8 +109,9 @@ frappe.query_reports["Purchase Order Report New"] = {
 		report._po_poll_timer = setInterval(function () {
 			if (!report.datatable) return;
 			po_read_checked(report);
-		}, 700);
+		},);
 	},
+
 
 	after_datatable_render: function (report) {
 		setTimeout(function () {
@@ -303,120 +323,6 @@ function po_fetch_and_render(report) {
 	});
 }
 
-// function po_render_panel(report, items, po_names) {
-// 	console.log("po_render_panel dialog called");
-// 	console.log("items:", items);
-
-// 	var meta =
-// 		po_names.length + " PO" + (po_names.length > 1 ? "s" : "") +
-// 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
-
-// 	var html =
-// 		'<div class="po-dialog-wrap">' +
-// 			'<div class="po-dialog-meta">' + po_esc(meta) + '</div>' +
-// 			po_make_item_table(items) +
-// 		'</div>';
-
-// 	var dialog = new frappe.ui.Dialog({
-// 		title: __("Purchase Order Item Details"),
-// 		size: "extra-large",
-// 		fields: [
-// 			{
-// 				fieldtype: "HTML",
-// 				fieldname: "item_details_html",
-// 				options: html,
-// 			},
-// 		],
-// 		primary_action_label: __("Close"),
-// 		primary_action: function () {
-// 			dialog.hide();
-// 		},
-// 	});
-
-// 	dialog.show();
-// }
-
-
-
-
-// function po_make_item_table(items) {
-// 	if (!items.length) {
-// 		return '<div style="padding:12px;color:#6b7280;">No Purchase Order Item rows found.</div>';
-// 	}
-
-// 	var rows = items.map(function (it) {
-// 		return '' +
-// 			'<tr>' +
-// 				'<td>' +
-// 					'<a href="/app/purchase-order/' + encodeURIComponent(it.parent || "") + '" target="_blank">' +
-// 						po_esc(it.parent || "-") +
-// 					'</a>' +
-// 				'</td>' +
-// 				'<td>' + po_esc(it.item_name || "-") + '</td>' +
-// 				'<td style="text-align:right;">' + po_fmt_num(it.qty) + '</td>' +
-// 				'<td>' + po_esc(it.uom || "-") + '</td>' +
-// 				'<td style="text-align:right;">Rs. ' + po_fmt_money(it.rate) + '</td>' +
-// 				'<td style="text-align:right;">Rs. ' + po_fmt_money(it.amount) + '</td>' +
-// 			'</tr>';
-// 	}).join("");
-
-// 	return '' +
-// 		'<table class="table table-bordered" style="margin:0;">' +
-// 			'<thead>' +
-// 				'<tr>' +
-// 					'<th>PO ID</th>' +
-// 					'<th>Item Name</th>' +
-// 					'<th style="text-align:right;">Quantity</th>' +
-// 					'<th>UOM</th>' +
-// 					'<th style="text-align:right;">Rate</th>' +
-// 					'<th style="text-align:right;">Total Amount</th>' +
-// 				'</tr>' +
-// 			'</thead>' +
-// 			'<tbody>' + rows + '</tbody>' +
-// 		'</table>';
-// }
-
-
-// function po_render_panel(report, items, po_names) {
-// 	report._po_detail_items = items || [];
-
-// 	var meta =
-// 		po_names.length + " PO" + (po_names.length > 1 ? "s" : "") +
-// 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
-
-// 	var html =
-// 		'<div id="po-detail-panel">' +
-// 			'<div class="po-dp-hdr">' +
-// 				'<div>' + __("Purchase Order Item Details") + '</div>' +
-// 				'<div class="po-dp-meta">' + po_esc(meta) + '</div>' +
-// 				'<button class="btn btn-xs btn-default" id="po-detail-excel">Excel</button>' +
-// 				'<button class="btn btn-xs btn-default" id="po-detail-pdf">PDF</button>' +
-// 			'</div>' +
-// 			'<div class="po-dp-body">' +
-// 				po_make_item_table(items) +
-// 			'</div>' +
-// 		'</div>';
-
-// 	var $wrapper = $(report.page.main);
-
-// 	$wrapper.find("#po-detail-panel").remove();
-
-// 	if (report.datatable && report.datatable.wrapper) {
-// 		$(report.datatable.wrapper).after(html);
-// 	} else {
-// 		$wrapper.append(html);
-// 	}
-
-// 	$("#po-detail-excel").on("click", function () {
-// 		po_export_detail_excel(report._po_detail_items || []);
-// 	});
-
-// 	$("#po-detail-pdf").on("click", function () {
-// 		po_export_detail_pdf();
-// 	});
-// }
-
-
 
 function po_make_item_table(items) {
 	if (!items.length) {
@@ -526,12 +432,13 @@ function po_export_detail_excel(items) {
 	}
 
 	var rows = [
-		["PO ID", "Item Name", "Quantity", "UOM", "Rate", "Total Amount"]
+		["PO ID", "Material Request ID","Item Name", "Quantity", "UOM", "Rate", "Total Amount"]
 	];
 
 	items.forEach(function (it) {
 		rows.push([
 			it.parent || "",
+			it.material_request || "",
 			it.item_name || "",
 			it.qty || 0,
 			it.uom || "",
@@ -596,7 +503,7 @@ function po_open_detail_tab(items, po_names) {
 	var meta =
 		po_names.length + " PO" + (po_names.length > 1 ? "s" : "") +
 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
-
+    
 	var html =
 		'<!doctype html>' +
 		'<html>' +
@@ -648,8 +555,8 @@ function po_open_detail_tab(items, po_names) {
 						'<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">' +
 						'<input id="filter-item" placeholder="Item Name" oninput="filterDetailTable()">' +
 						'<div></div>' +
-						'<button onclick="window.print()">PDF / Print</button>' +
-						'<button onclick="downloadExcel()">Excel</button>' +
+						'<button onclick="window.print()">PDF With Detail</button>' +
+						'<button onclick="downloadExcel()">Excel With Detail<</button>' +
 					'</div>' +
 
 					'<div class="table-wrap">' +
@@ -698,16 +605,44 @@ function po_open_detail_tab(items, po_names) {
 					'updateCount();' +
 				'}' +
 
+				'var detailItems = ' + JSON.stringify(items).replace(/</g, "\\u003c") + ';' +
+
 				'function downloadExcel(){' +
-					'var table=document.querySelector("table").cloneNode(true);' +
-					'Array.from(table.querySelectorAll("tbody tr")).forEach(function(row){' +
-						'if(row.style.display==="none" || row.classList.contains("hidden-print")) row.remove();' +
+					'var rows = [[' +
+						'"PO ID","Date","Company","Supplier","Required By","PO Grand Total","PO Net Total","PO Total Qty","Status","Item No.","Material Request ID","Item Name","Quantity","UOM","Rate","Item Amount"' +
+					']];' +
+
+					'detailItems.forEach(function(it){' +
+						'rows.push([' +
+							'it.po_id || it.parent || "",' +
+							'it.date || "",' +
+							'it.company || "",' +
+							'it.supplier || "",' +
+							'it.required_by || "",' +
+							'it.grand_total || 0,' +
+							'it.net_total || 0,' +
+							'it.total_qty || 0,' +
+							'it.workflow_state || "",' +
+							'it.idx || "",' +
+							'it.material_request || "",' +
+							'it.item_name || "",' +
+							'it.qty || 0,' +
+							'it.uom || "",' +
+							'it.rate || 0,' +
+							'it.amount || 0' +
+						']);' +
 					'});' +
-					'var html="<!doctype html><html><head><meta charset=\\"utf-8\\"></head><body>"+table.outerHTML+"</body></html>";' +
-					'var blob=new Blob([html],{type:"application/vnd.ms-excel"});' +
-					'var a=document.createElement("a");' +
-					'a.href=URL.createObjectURL(blob);' +
-					'a.download="purchase_order_item_details.xls";' +
+
+					'var csv = rows.map(function(row){' +
+						'return row.map(function(cell){' +
+							'return "\\"" + String(cell == null ? "" : cell).replace(/"/g, "\\"\\"") + "\\"";' +
+						'}).join(",");' +
+					'}).join("\\n");' +
+
+					'var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});' +
+					'var a = document.createElement("a");' +
+					'a.href = URL.createObjectURL(blob);' +
+					'a.download = "purchase_order_with_item_details.csv";' +
 					'document.body.appendChild(a);' +
 					'a.click();' +
 					'document.body.removeChild(a);' +
@@ -754,7 +689,7 @@ function po_make_item_table_for_new_tab(items) {
 
 		rows += '' +
 			'<tr class="po-group-row" data-po="' + po_esc(po_id) + '">' +
-				'<td colspan="6">' +
+				'<td colspan="7">' +
 					'<a class="doc-link" href="/app/purchase-order/' + encodeURIComponent(po_id) + '" target="_blank">' +
 						po_esc(po_id) +
 					'</a>' +
@@ -763,6 +698,7 @@ function po_make_item_table_for_new_tab(items) {
 			'</tr>';
 
 		rows += po_items.map(function (it, index) {
+			var material_request = it.material_request || "";
 			var item_name = it.item_name || "";
 			var qty = po_fmt_num(it.qty);
 			var uom = it.uom || "";
@@ -772,6 +708,11 @@ function po_make_item_table_for_new_tab(items) {
 			return '' +
 				'<tr class="po-item-row" data-po="' + po_esc(po_id) + '" data-item="' + po_esc(item_name) + '">' +
 					'<td class="text-right">' + (index + 1) + '</td>' +
+					'<td title="' + po_esc(material_request) + '">' +
+						(material_request
+							? '<a class="doc-link" href="/app/material-request/' + encodeURIComponent(material_request) + '" target="_blank">' + po_esc(material_request) + '</a>'
+							: '-') +
+					'</td>' +
 					'<td>' + po_esc(item_name || "-") + '</td>' +
 					'<td class="text-right">' + po_esc(qty) + '</td>' +
 					'<td>' + po_esc(uom || "-") + '</td>' +
@@ -786,6 +727,7 @@ function po_make_item_table_for_new_tab(items) {
 			'<thead>' +
 				'<tr>' +
 					'<th style="width:55px;" class="text-right">No.</th>' +
+					'<th style="width:190px;">Material Request ID</th>' +
 					'<th>Item Name</th>' +
 					'<th style="width:110px;" class="text-right">Quantity</th>' +
 					'<th style="width:100px;">UOM</th>' +
@@ -795,4 +737,122 @@ function po_make_item_table_for_new_tab(items) {
 			'</thead>' +
 			'<tbody>' + rows + '</tbody>' +
 		'</table>';
+}
+
+
+function downloadDetailExcel(items) {
+	var rows = [
+		[
+			"PO ID",
+			"Date",
+			"Company",
+			"Supplier",
+			"Required By",
+			"PO Grand Total",
+			"PO Net Total",
+			"PO Total Qty",
+			"Status",
+			"Item No.",
+			"Material Request ID",
+			"Item Name",
+			"Quantity",
+			"UOM",
+			"Rate",
+			"Item Amount"
+		]
+	];
+
+	items.forEach(function (it) {
+		rows.push([
+			it.po_id || it.parent || "",
+			it.date || "",
+			it.company || "",
+			it.supplier || "",
+			it.required_by || "",
+			it.grand_total || 0,
+			it.net_total || 0,
+			it.total_qty || 0,
+			it.workflow_state || "",
+			it.idx || "",
+			it.material_request || "",
+			it.item_name || "",
+			it.qty || 0,
+			it.uom || "",
+			it.rate || 0,
+			it.amount || 0
+		]);
+	});
+
+	var csv = rows.map(function (row) {
+		return row.map(function (cell) {
+			return '"' + String(cell == null ? "" : cell).replace(/"/g, '""') + '"';
+		}).join(",");
+	}).join("\n");
+
+	var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+	var a = document.createElement("a");
+	a.href = URL.createObjectURL(blob);
+	a.download = "purchase_order_with_item_details.csv";
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+}
+
+
+function downloadDetailExcel(items) {
+	var rows = [
+		[
+			"PO ID",
+			"Date",
+			"Company",
+			"Supplier",
+			"Required By",
+			"PO Grand Total",
+			"PO Net Total",
+			"PO Total Qty",
+			"Status",
+			"Item No.",
+			"Material Request ID",
+			"Item Name",
+			"Quantity",
+			"UOM",
+			"Rate",
+			"Item Amount"
+		]
+	];
+
+	items.forEach(function (it) {
+		rows.push([
+			it.po_id || it.parent || "",
+			it.date || "",
+			it.company || "",
+			it.supplier || "",
+			it.required_by || "",
+			it.grand_total || 0,
+			it.net_total || 0,
+			it.total_qty || 0,
+			it.workflow_state || "",
+			it.idx || "",
+			it.material_request || "",
+			it.item_name || "",
+			it.qty || 0,
+			it.uom || "",
+			it.rate || 0,
+			it.amount || 0
+		]);
+	});
+
+	var csv = rows.map(function (row) {
+		return row.map(function (cell) {
+			return '"' + String(cell == null ? "" : cell).replace(/"/g, '""') + '"';
+		}).join(",");
+	}).join("\n");
+
+	var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+	var a = document.createElement("a");
+	a.href = URL.createObjectURL(blob);
+	a.download = "purchase_order_with_item_details.csv";
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
 }

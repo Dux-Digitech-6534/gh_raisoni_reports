@@ -57,6 +57,19 @@ def get_columns():
             "width": 100,
         },
         {
+            "fieldname": "basic_rate",
+            "label": _("Rate"),
+            "fieldtype": "Float",
+            "width": 100,
+        },
+        {
+            "fieldname": "amount",
+            "label": _("Amount"),
+            "fieldtype": "Float",
+            "width": 100,
+        },
+        
+        {
             "fieldname": "s_warehouse",
             "label": _("Warehouse"),
             "fieldtype": "Link",
@@ -83,6 +96,8 @@ def get_data(filters):
             sed.item_code,
             sed.qty,
             sed.uom,
+            sed.basic_rate,
+            sed.amount,
             sed.s_warehouse
         FROM `tabStock Entry` se
         INNER JOIN `tabStock Entry Detail` sed

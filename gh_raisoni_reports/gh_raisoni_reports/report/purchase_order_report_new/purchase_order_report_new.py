@@ -20,6 +20,12 @@ def get_columns():
             "width": 190,
         },
         {
+            "fieldname": "material_request",
+            "label": _("Material Request ID"),
+            "fieldtype": "Data",
+            "width": 190,
+        },
+        {
             "fieldname": "date",
             "label": _("Date"),
             "fieldtype": "Date",
@@ -81,6 +87,7 @@ def get_data(filters):
         f"""
         SELECT
             po.name,
+            GROUP_CONCAT(DISTINCT poi.material_request ORDER BY poi.material_request SEPARATOR ', ') AS material_request,
             po.transaction_date AS date,
             po.company,
             po.supplier,
@@ -91,9 +98,13 @@ def get_data(filters):
             po.workflow_state
         FROM
             `tabPurchase Order` po
+        LEFT JOIN
+            `tabPurchase Order Item` poi ON poi.parent = po.name
         WHERE
             po.docstatus < 2
             {conditions}
+        GROUP BY
+            po.name
         ORDER BY
             po.transaction_date DESC
         """,
@@ -137,19 +148,37 @@ def get_po_item_details(po_names):
     if not po_names:
         return []
 
-    return frappe.db.get_all(
-        "Purchase Order Item",
-        filters={
-            "parent": ["in", po_names],
-        },
-        fields=[
-            "parent",
-            "idx",
-            "item_name",
-            "qty",
-            "uom",
-            "rate",
-            "amount",
-        ],
-        order_by="parent asc, idx asc",
+    return frappe.db.sql(
+        """
+        SELECT
+            po.name AS po_id,
+            po.transaction_date AS date,
+            po.company,
+            po.supplier,
+            po.schedule_date AS required_by,
+            po.grand_total,
+            po.net_total,
+            po.total_qty,
+            po.workflow_state,
+
+            poi.parent,
+            poi.idx,
+            poi.material_request,
+            poi.item_name,
+            poi.item_group,
+            poi.qty,
+            poi.uom,
+            poi.rate,
+            poi.amount
+        FROM
+            `tabPurchase Order Item` poi
+        INNER JOIN
+            `tabPurchase Order` po ON po.name = poi.parent
+        WHERE
+            poi.parent IN %(po_names)s
+        ORDER BY
+            poi.parent ASC, poi.idx ASC
+        """,
+        {"po_names": tuple(po_names)},
+        as_dict=True,
     )

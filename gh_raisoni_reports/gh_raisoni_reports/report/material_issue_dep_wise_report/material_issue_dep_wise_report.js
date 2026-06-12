@@ -292,6 +292,7 @@ function mi_make_table(items) {
         '<th style="width:45px;" class="text-right">No.</th>' +
         '<th>Item Code</th>' +
         '<th>Item Name</th>' +
+        '<th>Item Group</th>' +
         '<th style="width:100px;" class="text-right">Qty</th>' +
         '<th style="width:80px;">UOM</th>' +
         '<th style="width:120px;" class="text-right">Rate</th>' +

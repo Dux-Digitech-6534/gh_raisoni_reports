@@ -165,6 +165,7 @@ def get_po_item_details(po_names):
             poi.idx,
             poi.material_request,
             poi.item_name,
+            poi.item_group,
             poi.qty,
             poi.uom,
             poi.rate,

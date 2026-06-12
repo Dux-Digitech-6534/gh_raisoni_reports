@@ -394,6 +394,7 @@ def get_conditions(filters):
 
     if filters.get("status"):
         conditions += " AND pr.status = %(status)s"
+   
 
     return conditions
 
@@ -418,6 +419,7 @@ def get_receipt_item_details(receipt_names):
             pri.material_request,
             pri.item_code,
             pri.item_name,
+            pri.item_group,
             COALESCE(pri.received_qty, pri.qty, 0) AS qty,
             pri.uom,
             pri.rate,

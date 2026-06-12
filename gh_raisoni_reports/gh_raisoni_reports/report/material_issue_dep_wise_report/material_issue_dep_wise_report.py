@@ -45,6 +45,13 @@ def get_columns():
             "width": 180,
         },
         {
+            "fieldname": "item_group",
+            "label": _("Item Group"),
+            "fieldtype": "Link",
+            "options": "Item Group",
+            "width": 180,
+        },
+        {
             "fieldname": "qty",
             "label": _("Qty"),
             "fieldtype": "Float",
@@ -94,6 +101,7 @@ def get_data(filters):
                 IFNULL(se.custom_department, '')
             ) AS custom_department,
             sed.item_code,
+            sed.item_group,
             sed.qty,
             sed.uom,
             sed.basic_rate,

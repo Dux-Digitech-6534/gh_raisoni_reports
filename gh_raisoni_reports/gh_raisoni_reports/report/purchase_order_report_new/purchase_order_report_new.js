@@ -184,7 +184,7 @@ function po_add_styles() {
 		.po-dialog-meta {
 			margin-bottom: 12px;
 			font-size: 13px;
-			font-weight: 700;
+			
 			color: #4b5563;
 		}
 	    .po-dialog-group {
@@ -203,7 +203,7 @@ function po_add_styles() {
 
 		.po-group-row td {
 			background: #f3f4f6;
-			font-weight: 800;
+			font-weight: 500;
 			color: #1f2937;
 			padding: 10px 8px !important;
 		}
@@ -220,7 +220,7 @@ function po_add_styles() {
 		.po-group-row span {
 			margin-left: 10px;
 			font-size: 12px;
-			font-weight: 700;
+			
 			color: #6b7280;
 		}
 		.dt-cell__content {
@@ -505,6 +505,7 @@ function po_open_detail_tab(items, po_names) {
 			'<style>' +
 				'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;color:#1f272e;background:#fff;font-size:14px;}' +
 				'.page{padding:16px 24px;}' +
+				'.amount-cell{color:#111827;}' +
 				'.report-card{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;}' +
 				'.report-header{padding:14px 16px 10px;border-bottom:1px solid #eef0f2;}' +
 				'.title{font-size:18px;font-weight:700;margin-bottom:4px;color:#0f172a;}' +
@@ -520,19 +521,25 @@ function po_open_detail_tab(items, po_names) {
 				'th{background:#f3f4f6;color:#111827;text-align:left;font-weight:600;position:sticky;top:0;z-index:2;}' +
 				'td:last-child,th:last-child{border-right:0;}' +
 				'.text-right{text-align:right;}' +
-				'.po-group-row td{background:#f3f4f6;font-weight:800;color:#111827;}' +
-				'.doc-link{color:#111827;text-decoration:none;font-weight:700;}' +
-				'.doc-link:hover{text-decoration:underline;color:#2563eb;}' +
-				'.group-count{margin-left:10px;color:#6b7280;font-size:12px;font-weight:700;}' +
+				'.po-group-row td{background:#f3f4f6;font-weight:500;color:#111827;}' +
+				'.doc-link{color:#111827;text-decoration:none;}' +
+				'.doc-link:hover{text-decoration:underline;color:#black;}' +
+				
 				'.empty{padding:16px;color:#6b7280;font-weight:600;}' +
 				'.count-pill{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:#4b5563;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;opacity:.92;}' +
 				'@media print{' +
+					'@page{size:landscape;margin:10mm;}' +
+					'.filter-row,.count-pill,.no-print{display:none!important;}' +
+					'body{background:#fff!important;}' +
 					'.filter-row,.count-pill{display:none!important;}' +
-					'.page{padding:0;}' +
-					'.report-card{border:0;border-radius:0;}' +
-					'.table-wrap{max-height:none;overflow:visible;}' +
-					'th{position:static;}' +
+					'.page{padding:0!important;}' +
+					'.report-card{border:0!important;border-radius:0!important;overflow:visible!important;}' +
+					'.table-wrap{max-height:none!important;overflow:visible!important;border-top:1px solid #eef0f2;}' +
+					'table{width:100%!important;table-layout:auto!important;}' +
+					'th{position:static!important;}' +
+					'th,td{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-size:11px!important;padding:6px!important;}' +
 					'tr.hidden-print{display:none!important;}' +
+					'a{color:#000!important;text-decoration:none!important;}' +
 				'}' +
 			'</style>' +
 		'</head>' +
@@ -548,8 +555,8 @@ function po_open_detail_tab(items, po_names) {
 						'<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">' +
 						'<input id="filter-item" placeholder="Item Name" oninput="filterDetailTable()">' +
 						'<div></div>' +
-						'<button onclick="window.print()">PDF</button>' +
-						'<button onclick="downloadExcel()">Excel</button>' +
+						'<button class="no-print" onclick="window.print()">PDF</button>' +
+                        '<button class="no-print" onclick="downloadExcel()">Excel</button>' +
 					'</div>' +
 
 					'<div class="table-wrap">' +
@@ -682,17 +689,18 @@ function po_make_item_table_for_new_tab(items) {
 
 		rows += '' +
 			'<tr class="po-group-row" data-po="' + po_esc(po_id) + '">' +
-				'<td colspan="7">' +
+				'<td colspan="8">' +
 					'<a class="doc-link" href="/app/purchase-order/' + encodeURIComponent(po_id) + '" target="_blank">' +
 						po_esc(po_id) +
 					'</a>' +
-					'<span class="group-count">' + po_items.length + ' item' + (po_items.length !== 1 ? 's' : '') + '</span>' +
+					
 				'</td>' +
 			'</tr>';
 
 		rows += po_items.map(function (it, index) {
 			var material_request = it.material_request || "";
 			var item_name = it.item_name || "";
+			var item_group = it.item_group || "";
 			var qty = po_fmt_num(it.qty);
 			var uom = it.uom || "";
 			var rate = po_fmt_money(it.rate);
@@ -700,17 +708,28 @@ function po_make_item_table_for_new_tab(items) {
 
 			return '' +
 				'<tr class="po-item-row" data-po="' + po_esc(po_id) + '" data-item="' + po_esc(item_name) + '">' +
+
 					'<td class="text-right">' + (index + 1) + '</td>' +
 					'<td title="' + po_esc(material_request) + '">' +
 						(material_request
 							? '<a class="doc-link" href="/app/material-request/' + encodeURIComponent(material_request) + '" target="_blank">' + po_esc(material_request) + '</a>'
 							: '-') +
 					'</td>' +
-					'<td>' + po_esc(item_name || "-") + '</td>' +
+					'<td title="' + po_esc(item_name) + '">' +
+						(item_name
+							? '<a class="doc-link" href="/app/item/' + encodeURIComponent(it.item_code || item_name) + '" target="_blank">' + po_esc(item_name) + '</a>'
+							: '-') +
+					'</td>' +
+
+					'<td title="' + po_esc(item_group) + '">' +
+						(item_group
+							? '<a class="doc-link" href="/app/item-group/' + encodeURIComponent(item_group) + '" target="_blank">' + po_esc(item_group) + '</a>'
+							: '-') +
+					'</td>' +
 					'<td class="text-right">' + po_esc(qty) + '</td>' +
 					'<td>' + po_esc(uom || "-") + '</td>' +
 					'<td class="text-right">Rs. ' + po_esc(rate) + '</td>' +
-					'<td class="text-right">Rs. ' + po_esc(amount) + '</td>' +
+					'<td class="text-right amount-cell">Rs. ' + po_esc(amount) + '</td>' +
 				'</tr>';
 		}).join("");
 	});
@@ -721,11 +740,12 @@ function po_make_item_table_for_new_tab(items) {
 				'<tr>' +
 					'<th style="width:55px;" class="text-right">No.</th>' +
 					'<th style="width:190px;">Material Request ID</th>' +
-					'<th>Item Name</th>' +
+					'<th style="width:100px;">Item Name</th>' +
+					'<th style="width:110px;">Item Group</th>' +
 					'<th style="width:110px;" class="text-right">Quantity</th>' +
 					'<th style="width:100px;">UOM</th>' +
 					'<th style="width:130px;" class="text-right">Rate</th>' +
-					'<th style="width:150px;" class="text-right">Total Amount</th>' +
+					'<th style="width:150px;" class="text-right amount-cell">Total Amount</th>' +
 				'</tr>' +
 			'</thead>' +
 			'<tbody>' + rows + '</tbody>' +
@@ -748,6 +768,7 @@ function downloadDetailExcel(items) {
 			"Item No.",
 			"Material Request ID",
 			"Item Name",
+			"Item Group",
 			"Quantity",
 			"UOM",
 			"Rate",
@@ -769,6 +790,7 @@ function downloadDetailExcel(items) {
 			it.idx || "",
 			it.material_request || "",
 			it.item_name || "",
+			it.item_group || "",
 			it.qty || 0,
 			it.uom || "",
 			it.rate || 0,
@@ -807,6 +829,7 @@ function downloadDetailExcel(items) {
 			"Item No.",
 			"Material Request ID",
 			"Item Name",
+			"Item Group",
 			"Quantity",
 			"UOM",
 			"Rate",
@@ -828,6 +851,7 @@ function downloadDetailExcel(items) {
 			it.idx || "",
 			it.material_request || "",
 			it.item_name || "",
+			it.item_group || "",
 			it.qty || 0,
 			it.uom || "",
 			it.rate || 0,

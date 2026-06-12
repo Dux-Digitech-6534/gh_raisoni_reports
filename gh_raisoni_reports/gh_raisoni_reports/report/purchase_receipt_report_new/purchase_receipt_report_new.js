@@ -714,6 +714,7 @@ function pr_make_item_table_for_new_tab(items) {
 		var purchase_order = it.purchase_order || "";
 		var material_request = it.material_request || "";
 		var item_name = it.item_name || "";
+		var item_group = it.item_group || "";
 		var qty = pr_fmt_num(it.qty);
 		var uom = it.uom || "";
 		var rate = pr_fmt_money(it.rate);
@@ -727,6 +728,7 @@ function pr_make_item_table_for_new_tab(items) {
 			'<tr ' +
 				'data-receipt="' + pr_esc(receipt_id) + '" ' +
 				'data-item="' + pr_esc(item_name) + '"' +
+				'data-item="' + pr_esc(item_group) + '"' +
 			'>' +
 				'<td class="text-right">' + (index + 1) + '</td>' +
 				'<td>' +
@@ -739,6 +741,7 @@ function pr_make_item_table_for_new_tab(items) {
 				'<td>' + pr_make_multi_link("material-request", material_request) + '</td>' +
 				'<td title="' + pr_esc(expense_head) + '">' + pr_esc(expense_head || "-") + '</td>' +
 				'<td>' + pr_esc(item_name || "-") + '</td>' +
+				'<td>' + pr_esc(item_group || "-") + '</td>' +
 				'<td class="text-right">' + pr_esc(qty) + '</td>' +
 				'<td>' + pr_esc(uom || "-") + '</td>' +
 				'<td class="text-right">Rs. ' + pr_esc(rate) + '</td>' +
@@ -758,6 +761,7 @@ function pr_make_item_table_for_new_tab(items) {
 					'<th style="width:190px;">Material Request</th>' +
 					'<th style="width:210px;">Expense Head</th>' +
 					'<th style="width:150px;">Item Name</th>' +
+					'<th style="width:100px;">Item Group</th>' +
 					'<th style="width:110px;" class="text-right">Quantity</th>' +
 					'<th style="width:100px;">UOM</th>' +
 					'<th style="width:130px;" class="text-right">Rate</th>' +

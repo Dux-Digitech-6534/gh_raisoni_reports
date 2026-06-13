@@ -5,6 +5,7 @@ from frappe import _
 
 
 def execute(filters=None):
+    filters = filters or {}
     columns = get_columns()
     data = get_data(filters)
     return columns, data
@@ -21,9 +22,9 @@ def get_columns():
         },
         {
             "fieldname": "material_request",
-            "label": _("Material Request ID"),
+            "label": _("Material Request"),
             "fieldtype": "Data",
-            "width": 190,
+            "width": 230,
         },
         {
             "fieldname": "date",
@@ -87,7 +88,16 @@ def get_data(filters):
         f"""
         SELECT
             po.name,
-            GROUP_CONCAT(DISTINCT poi.material_request ORDER BY poi.material_request SEPARATOR ', ') AS material_request,
+
+            IFNULL(
+                GROUP_CONCAT(
+                    DISTINCT COALESCE(NULLIF(poi.material_request, ''), mri.parent)
+                    ORDER BY COALESCE(NULLIF(poi.material_request, ''), mri.parent)
+                    SEPARATOR ', '
+                ),
+                ''
+            ) AS material_request,
+
             po.transaction_date AS date,
             po.company,
             po.supplier,
@@ -100,15 +110,25 @@ def get_data(filters):
             `tabPurchase Order` po
         LEFT JOIN
             `tabPurchase Order Item` poi ON poi.parent = po.name
+        LEFT JOIN
+            `tabMaterial Request Item` mri ON mri.name = poi.material_request_item
         WHERE
             po.docstatus < 2
             {conditions}
         GROUP BY
-            po.name
+            po.name,
+            po.transaction_date,
+            po.company,
+            po.supplier,
+            po.schedule_date,
+            po.grand_total,
+            po.net_total,
+            po.total_qty,
+            po.workflow_state
         ORDER BY
             po.transaction_date DESC
         """,
-        filters or {},
+        filters,
         as_dict=True,
     )
 
@@ -137,6 +157,22 @@ def get_conditions(filters):
     if filters.get("workflow_state"):
         conditions += " AND po.workflow_state = %(workflow_state)s"
 
+    if filters.get("material_request"):
+        conditions += """
+            AND EXISTS (
+                SELECT
+                    1
+                FROM
+                    `tabPurchase Order Item` poi_filter
+                LEFT JOIN
+                    `tabMaterial Request Item` mri_filter
+                        ON mri_filter.name = poi_filter.material_request_item
+                WHERE
+                    poi_filter.parent = po.name
+                    AND COALESCE(NULLIF(poi_filter.material_request, ''), mri_filter.parent) = %(material_request)s
+            )
+        """
+
     return conditions
 
 
@@ -163,7 +199,10 @@ def get_po_item_details(po_names):
 
             poi.parent,
             poi.idx,
-            poi.material_request,
+
+            COALESCE(NULLIF(poi.material_request, ''), mri.parent, '') AS material_request,
+
+            poi.item_code,
             poi.item_name,
             poi.item_group,
             poi.qty,
@@ -174,10 +213,13 @@ def get_po_item_details(po_names):
             `tabPurchase Order Item` poi
         INNER JOIN
             `tabPurchase Order` po ON po.name = poi.parent
+        LEFT JOIN
+            `tabMaterial Request Item` mri ON mri.name = poi.material_request_item
         WHERE
             poi.parent IN %(po_names)s
         ORDER BY
-            poi.parent ASC, poi.idx ASC
+            poi.parent ASC,
+            poi.idx ASC
         """,
         {"po_names": tuple(po_names)},
         as_dict=True,

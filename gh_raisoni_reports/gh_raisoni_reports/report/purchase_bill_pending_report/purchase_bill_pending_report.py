@@ -209,6 +209,7 @@
 
 import frappe
 
+
 def execute(filters=None):
     filters = filters or {}
     columns = get_columns()
@@ -218,14 +219,56 @@ def execute(filters=None):
 
 def get_columns():
     return [
-        {"label": "Date", "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
-        {"label": "Tracking Number", "fieldname": "grn", "fieldtype": "Link", "options": "Purchase Receipt", "width": 150},
-        {"label": "Party's Name", "fieldname": "supplier", "fieldtype": "Link", "options": "Supplier", "width": 180},
-        {"label": "Name of Item", "fieldname": "item_name", "fieldtype": "Data", "width": 220},
-        {"label": "Initial Qty", "fieldname": "qty", "fieldtype": "Float", "width": 100},
-        {"label": "Pending Qty", "fieldname": "pending_qty", "fieldtype": "Float", "width": 100},
-        {"label": "Rate", "fieldname": "rate", "fieldtype": "Currency", "width": 100},
-        {"label": "Value", "fieldname": "amount", "fieldtype": "Currency", "width": 120},
+        {
+            "label": "Date",
+            "fieldname": "posting_date",
+            "fieldtype": "Date",
+            "width": 100
+        },
+        {
+            "label": "Tracking Number",
+            "fieldname": "grn",
+            "fieldtype": "Link",
+            "options": "Purchase Receipt",
+            "width": 150
+        },
+        {
+            "label": "Party's Name",
+            "fieldname": "supplier",
+            "fieldtype": "Link",
+            "options": "Supplier",
+            "width": 180
+        },
+        {
+            "label": "Name of Item",
+            "fieldname": "item_name",
+            "fieldtype": "Data",
+            "width": 220
+        },
+        {
+            "label": "Initial Qty",
+            "fieldname": "qty",
+            "fieldtype": "Float",
+            "width": 100
+        },
+        {
+            "label": "Pending Qty",
+            "fieldname": "pending_qty",
+            "fieldtype": "Float",
+            "width": 100
+        },
+        {
+            "label": "Rate",
+            "fieldname": "rate",
+            "fieldtype": "Currency",
+            "width": 100
+        },
+        {
+            "label": "Value",
+            "fieldname": "amount",
+            "fieldtype": "Currency",
+            "width": 120
+        },
     ]
 
 
@@ -248,9 +291,13 @@ def get_data(filters):
             x.supplier,
             x.item_name,
             x.qty,
-            x.pending_qty,
+
+            GREATEST(x.pending_qty, 0) AS pending_qty,
+
             x.rate,
-            x.amount
+
+            GREATEST(x.pending_qty, 0) * x.rate AS amount
+
         FROM (
             SELECT
                 pr.posting_date,
@@ -258,18 +305,9 @@ def get_data(filters):
                 pr.supplier,
                 pri.item_name,
                 pri.qty,
-
-                GREATEST(
-                    pri.qty - IFNULL(billed.billed_qty, 0),
-                    0
-                ) AS pending_qty,
-
                 pri.rate,
 
-                GREATEST(
-                    pri.qty - IFNULL(billed.billed_qty, 0),
-                    0
-                ) * pri.rate AS amount
+                pri.qty - IFNULL(billed.billed_qty, 0) AS pending_qty
 
             FROM `tabPurchase Receipt` pr
 
@@ -281,10 +319,14 @@ def get_data(filters):
                     pii.pr_detail,
                     SUM(pii.qty) AS billed_qty
                 FROM `tabPurchase Invoice Item` pii
+
                 INNER JOIN `tabPurchase Invoice` pi
                     ON pi.name = pii.parent
+
                 WHERE pi.docstatus = 1
                 AND pii.pr_detail IS NOT NULL
+                AND pii.pr_detail != ''
+
                 GROUP BY pii.pr_detail
             ) billed
                 ON billed.pr_detail = pri.name
@@ -295,12 +337,16 @@ def get_data(filters):
 
         WHERE
             CASE
-                WHEN %(billing_status)s = 'Pending' THEN x.pending_qty > 0
-                WHEN %(billing_status)s = 'Cleared' THEN x.pending_qty = 0
+                WHEN %(billing_status)s = 'Pending'
+                    THEN GREATEST(x.pending_qty, 0) > 0
+
+                WHEN %(billing_status)s = 'Cleared'
+                    THEN GREATEST(x.pending_qty, 0) = 0
+
                 ELSE 1 = 1
             END
 
-        ORDER BY x.posting_date DESC
+        ORDER BY x.posting_date DESC, x.grn DESC
     """, {
         "company": filters.get("company"),
         "supplier": filters.get("supplier"),

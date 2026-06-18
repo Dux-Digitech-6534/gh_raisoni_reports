@@ -1,78 +1,49 @@
 frappe.query_reports["Material Issue Dep Wise Report"] = {
-    filters: [
-    {
-        fieldname: "from_date",
-        label: __("From Date"),
-        fieldtype: "Date",
-        reqd: 1,
-        default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
-    },
-    {
-        fieldname: "to_date",
-        label: __("To Date"),
-        fieldtype: "Date",
-        reqd: 1,
-        default: frappe.datetime.get_today(),
-    },
-    {
-        fieldname: "name",
-        label: __("Material Issue ID"),
-        fieldtype: "Link",
-        options: "Stock Entry",
-    },
-    {
-        fieldname: "company",
-        label: __("Company"),
-        fieldtype: "Link",
-        options: "Company",
-    },
-    {
-        fieldname: "custom_department",
-        label: __("User Department"),
-        fieldtype: "Link",
-        options: "Department",
-    },
-    {
-        fieldname: "s_warehouse",
-        label: __("Warehouse"),
-        fieldtype: "Link",
-        options: "Warehouse",
-    },
-    {
-        fieldname: "item_name",
-        label: __("Item Name"),
-        fieldtype: "Data",
-    },
-],
-
-    get_datatable_options: function(options) {
-        options.checkboxColumn = true;
-        return options;
-    },
-
-   onload: function(report) {
-    report._mi_selected = {};
-
-    // ✅ Add Detail View button with count
-		report._dp_btn = report.page
-			.add_inner_button(__("Detail View") + " (0)", function() {
-				mi_read_checked(report);
-				mi_fetch_and_render(report);
-			});
-
-		// ✅ Poll every 500ms to detect checkbox changes
-		setInterval(function() {
-			if (!report.datatable) return; 
-			mi_read_checked(report);
-		}, 500);
-	},
-
-
-    after_datatable_render: function(report) {
-        setTimeout(function() {
-            mi_read_checked(report);
-        }, 500);
-    },
+	filters: [
+		{
+			fieldname: "from_date",
+			label: __("From Date"),
+			fieldtype: "Date",
+			reqd: 1,
+			default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+		},
+		{
+			fieldname: "to_date",
+			label: __("To Date"),
+			fieldtype: "Date",
+			reqd: 1,
+			default: frappe.datetime.get_today(),
+		},
+		{
+			fieldname: "name",
+			label: __("Material Issue ID"),
+			fieldtype: "Link",
+			options: "Stock Entry",
+		},
+		{
+			fieldname: "company",
+			label: __("Company"),
+			fieldtype: "Link",
+			options: "Company",
+		},
+		{
+			fieldname: "custom_department",
+			label: __("User Department"),
+			fieldtype: "Link",
+			options: "Department",
+		},
+		{
+			fieldname: "s_warehouse",
+			label: __("Warehouse"),
+			fieldtype: "Link",
+			options: "Warehouse",
+		},
+		{
+			fieldname: "item_name",
+			label: __("Item Name"),
+			fieldtype: "Data",
+		},
+	],
 };
 
 

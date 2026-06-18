@@ -221,7 +221,7 @@ function pr_open_detail_tab(items, receipt_names) {
 				'.item-img img{width:100%;height:100%;object-fit:cover;}' +
 				'.empty{padding:16px;color:#6b7280;font-weight:600;}' +
 				'.count-pill{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:#4b5563;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;opacity:.92;}' +
-				'.col-no{width:55px;}.col-receipt{width:180px;}.col-supplier{width:190px;}.col-po{width:170px;}.col-mr{width:170px;}.col-expense{width:190px;}.col-item{width:160px;}.col-group{width:110px;}.col-qty{width:100px;}.col-uom{width:80px;}.col-rate{width:120px;}.col-amount{width:140px;}.col-image{width:90px;}' +
+				'.col-no{width:55px;}.col-receipt{width:180px;}.col-supplier{width:190px;}.col-pi{width:190px;}.col-expense{width:190px;}.col-item{width:170px;}.col-group{width:120px;}.col-qty{width:100px;}.col-uom{width:80px;}.col-rate{width:120px;}.col-amount{width:140px;}' +
 				'@media print{' +
 					'@page{size:A4 landscape;margin:6mm;}' +
 					'html,body{width:auto!important;height:auto!important;background:#fff!important;margin:0!important;padding:0!important;}' +
@@ -236,8 +236,7 @@ function pr_open_detail_tab(items, receipt_names) {
 					'th{position:static!important;}' +
 					'th,td{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;word-break:break-word!important;font-size:6.5px!important;line-height:1.2!important;padding:2px!important;}' +
 					'.print-hide{display:none!important;}' +
-					'.col-no{width:3%!important;}.col-receipt{width:9%!important;}.col-supplier{width:13%!important;}.col-po{width:9%!important;}.col-mr{width:9%!important;}.col-expense{width:10%!important;}.col-item{width:12%!important;}.col-group{width:7%!important;}.col-qty{width:6%!important;}.col-uom{width:4%!important;}.col-rate{width:8%!important;}.col-amount{width:10%!important;}' +
-					'tr.hidden-print{display:none!important;}' +
+                    '.col-no{width:4%!important;}.col-receipt{width:12%!important;}.col-supplier{width:14%!important;}.col-pi{width:13%!important;}.col-expense{width:13%!important;}.col-item{width:13%!important;}.col-group{width:9%!important;}.col-qty{width:6%!important;}.col-uom{width:5%!important;}.col-rate{width:5%!important;}.col-amount{width:6%!important;}' + 					'tr.hidden-print{display:none!important;}' +
 					'a{color:#000!important;text-decoration:none!important;}' +
 				'}' +
 			'</style>' +
@@ -340,8 +339,7 @@ function pr_make_item_table_for_new_tab(items) {
 	var rows = items.map(function (it, index) {
 		var receipt_id = it.receipt_id || it.parent || "";
 		var supplier = it.supplier || "";
-		var purchase_order = it.purchase_order || "";
-		var material_request = it.material_request || "";
+		var purchase_invoice_details = it.purchase_invoice_details || "";
 		var expense_head = it.expense_head || "";
 		var item_code = it.item_code || "";
 		var item_name = it.item_name || item_code || "";
@@ -350,19 +348,22 @@ function pr_make_item_table_for_new_tab(items) {
 		var uom = it.uom || "";
 		var rate = pr_fmt_money(it.rate);
 		var amount = pr_fmt_money(it.amount);
-		var search_text = [supplier, purchase_order, material_request, expense_head, item_code, item_name, item_group].join(" ");
 
-		var image_html = it.item_image
-			? '<div class="item-img"><img src="' + pr_esc(it.item_image) + '" alt=""></div>'
-			: '<div class="item-img">No Image</div>';
+		var search_text = [
+			supplier,
+			purchase_invoice_details,
+			expense_head,
+			item_code,
+			item_name,
+			item_group
+		].join(" ");
 
 		return '' +
 			'<tr class="pr-item-row" data-receipt="' + pr_esc(receipt_id) + '" data-search="' + pr_esc(search_text) + '">' +
 				'<td class="text-right col-no">' + (index + 1) + '</td>' +
 				'<td class="col-receipt">' + pr_make_link("purchase-receipt", receipt_id) + '</td>' +
 				'<td class="col-supplier" title="' + pr_esc(supplier) + '">' + pr_make_link("supplier", supplier) + '</td>' +
-				'<td class="col-po">' + pr_make_multi_link("purchase-order", purchase_order) + '</td>' +
-				'<td class="col-mr">' + pr_make_multi_link("material-request", material_request) + '</td>' +
+				'<td class="col-pi">' + pr_make_multi_link("purchase-invoice", purchase_invoice_details) + '</td>' +
 				'<td class="col-expense" title="' + pr_esc(expense_head) + '">' + pr_esc(expense_head || "-") + '</td>' +
 				'<td class="col-item" title="' + pr_esc(item_name) + '">' +
 					(item_name
@@ -378,7 +379,6 @@ function pr_make_item_table_for_new_tab(items) {
 				'<td class="col-uom">' + pr_esc(uom || "-") + '</td>' +
 				'<td class="text-right col-rate">Rs. ' + pr_esc(rate) + '</td>' +
 				'<td class="text-right col-amount amount-cell">Rs. ' + pr_esc(amount) + '</td>' +
-				'<td class="col-image print-hide export-hide">' + image_html + '</td>' +
 			'</tr>';
 	}).join("");
 
@@ -389,8 +389,7 @@ function pr_make_item_table_for_new_tab(items) {
 					'<th class="text-right col-no">No.</th>' +
 					'<th class="col-receipt">Purchase Receipt No.</th>' +
 					'<th class="col-supplier">Supplier</th>' +
-					'<th class="col-po">Purchase Order</th>' +
-					'<th class="col-mr">Material Request</th>' +
+					'<th class="col-pi">Purchase Invoice ID</th>' +
 					'<th class="col-expense">Expense Head</th>' +
 					'<th class="col-item">Item Name</th>' +
 					'<th class="col-group">Item Group</th>' +
@@ -398,7 +397,6 @@ function pr_make_item_table_for_new_tab(items) {
 					'<th class="col-uom">UOM</th>' +
 					'<th class="text-right col-rate">Rate</th>' +
 					'<th class="text-right col-amount amount-cell">Total Amount</th>' +
-					'<th class="col-image print-hide export-hide">Image</th>' +
 				'</tr>' +
 			'</thead>' +
 			'<tbody>' + rows + '</tbody>' +

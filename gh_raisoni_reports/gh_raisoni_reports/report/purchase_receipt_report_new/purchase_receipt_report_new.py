@@ -188,6 +188,83 @@ def get_conditions(filters):
     return conditions
 
 
+# @frappe.whitelist()
+# def get_receipt_item_details(receipt_names):
+#     if isinstance(receipt_names, str):
+#         receipt_names = json.loads(receipt_names)
+
+#     if not receipt_names:
+#         return []
+
+#     return frappe.db.sql(
+#         """
+#         SELECT
+#             /* Parent Purchase Receipt Data */
+#             pr.posting_date AS posting_date,
+#             pr.posting_date AS date,
+#             pr.name AS receipt_id,
+#             pr.name AS purchase_receipt,
+#             pr.company AS company,
+#             pr.supplier AS supplier,
+#             pr.grand_total AS grand_total,
+#             pr.status AS status,
+
+#             /* Parent references from child row */
+#             pri.purchase_order AS purchase_order,
+#             pri.material_request AS material_request,
+
+#             /* Purchase Invoice */
+#             inv.purchase_invoice_details AS purchase_invoice_details,
+
+#             /* Child Item Data */
+#             pri.expense_account AS expense_head,
+#             pri.idx AS idx,
+#             pri.item_code AS item_code,
+#             pri.item_name AS item_name,
+#             pri.item_group AS item_group,
+#             COALESCE(pri.received_qty, pri.qty, 0) AS qty,
+#             pri.uom AS uom,
+#             pri.rate AS rate,
+#             pri.amount AS amount
+
+#         FROM
+#             `tabPurchase Receipt Item` pri
+
+#         INNER JOIN
+#             `tabPurchase Receipt` pr
+#             ON pr.name = pri.parent
+
+#         LEFT JOIN
+#             (
+#                 SELECT
+#                     pii.purchase_receipt,
+#                     pii.item_code,
+#                     GROUP_CONCAT(DISTINCT pii.parent ORDER BY pii.parent SEPARATOR ', ') AS purchase_invoice_details
+#                 FROM
+#                     `tabPurchase Invoice Item` pii
+#                 INNER JOIN
+#                     `tabPurchase Invoice` pi
+#                     ON pi.name = pii.parent
+#                 WHERE
+#                     pi.docstatus < 2
+#                     AND pii.purchase_receipt IS NOT NULL
+#                     AND pii.purchase_receipt != ''
+#                 GROUP BY
+#                     pii.purchase_receipt, pii.item_code
+#             ) inv
+#             ON inv.purchase_receipt = pri.parent
+#             AND inv.item_code = pri.item_code
+
+#         WHERE
+#             pri.parent IN %(receipt_names)s
+
+#         ORDER BY
+#             pr.posting_date DESC, pri.parent ASC, pri.idx ASC
+#         """,
+#         {"receipt_names": tuple(receipt_names)},
+#         as_dict=True,
+#     )
+
 @frappe.whitelist()
 def get_receipt_item_details(receipt_names):
     if isinstance(receipt_names, str):
@@ -199,24 +276,41 @@ def get_receipt_item_details(receipt_names):
     return frappe.db.sql(
         """
         SELECT
-            pri.parent AS receipt_id,
-            pr.supplier,
-            inv.purchase_invoice_details,
+            /* Parent Purchase Receipt Data */
+            pr.posting_date AS posting_date,
+            pr.posting_date AS date,
+            pr.name AS receipt_id,
+            pr.name AS purchase_receipt,
+            pr.company AS company,
+            pr.supplier AS supplier,
+            pr.grand_total AS grand_total,
+            pr.status AS status,
 
+            /* Parent references from child row */
+            pri.purchase_order AS purchase_order,
+            pri.material_request AS material_request,
+
+            /* Purchase Invoice */
+            inv.purchase_invoice_details AS purchase_invoice_details,
+
+            /* Child Item Data */
             pri.expense_account AS expense_head,
-
-            pri.idx,
-            pri.item_code,
-            pri.item_name,
-            pri.item_group,
+            pri.idx AS idx,
+            pri.item_code AS item_code,
+            pri.item_name AS item_name,
+            pri.item_group AS item_group,
             COALESCE(pri.received_qty, pri.qty, 0) AS qty,
-            pri.uom,
-            pri.rate,
-            pri.amount
+            pri.uom AS uom,
+            pri.rate AS rate,
+            pri.amount AS amount
+
         FROM
             `tabPurchase Receipt Item` pri
+
         INNER JOIN
-            `tabPurchase Receipt` pr ON pr.name = pri.parent
+            `tabPurchase Receipt` pr
+            ON pr.name = pri.parent
+
         LEFT JOIN
             (
                 SELECT
@@ -226,7 +320,8 @@ def get_receipt_item_details(receipt_names):
                 FROM
                     `tabPurchase Invoice Item` pii
                 INNER JOIN
-                    `tabPurchase Invoice` pi ON pi.name = pii.parent
+                    `tabPurchase Invoice` pi
+                    ON pi.name = pii.parent
                 WHERE
                     pi.docstatus < 2
                     AND pii.purchase_receipt IS NOT NULL
@@ -236,10 +331,12 @@ def get_receipt_item_details(receipt_names):
             ) inv
             ON inv.purchase_receipt = pri.parent
             AND inv.item_code = pri.item_code
+
         WHERE
             pri.parent IN %(receipt_names)s
+
         ORDER BY
-            pri.parent ASC, pri.idx ASC
+            pr.posting_date DESC, pri.parent ASC, pri.idx ASC
         """,
         {"receipt_names": tuple(receipt_names)},
         as_dict=True,

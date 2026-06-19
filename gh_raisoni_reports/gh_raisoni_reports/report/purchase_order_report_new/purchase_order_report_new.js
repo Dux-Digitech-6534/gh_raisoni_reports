@@ -1,22 +1,21 @@
 frappe.query_reports["Purchase Order Report New"] = {
 	filters: [
 		{
-			fieldname: "name",
+			fieldname: "po_id",
 			label: __("PO ID"),
-			fieldtype: "Link",
-			options: "Purchase Order",
+			fieldtype: "Data",
 		},
 		{
 			fieldname: "material_request",
 			label: __("Material Request"),
-			fieldtype: "Link",
-			options: "Material Request",
+			fieldtype: "Data",
 		},
 		{
 			fieldname: "company",
 			label: __("Company"),
 			fieldtype: "Link",
 			options: "Company",
+			default: frappe.defaults.get_user_default("Company"),
 		},
 		{
 			fieldname: "from_date",
@@ -37,10 +36,10 @@ frappe.query_reports["Purchase Order Report New"] = {
 			options: "Supplier",
 		},
 		{
-			fieldname: "workflow_state",
+			fieldname: "status",
 			label: __("Status"),
 			fieldtype: "Select",
-			options: "\nDraft\nPending\nTo Receive and Bill\nTo Bill\nTo Receive\nCompleted\nCancelled\nClosed\nApproved\nRejected",
+			options: "\nDraft\nTo Receive and Bill\nTo Bill\nTo Receive\nCompleted\nCancelled\nClosed\nDelivered",
 		},
 	],
 
@@ -52,37 +51,20 @@ frappe.query_reports["Purchase Order Report New"] = {
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 
-		if (column.fieldname === "name" && data && data.name) {
-			return po_make_link("purchase-order", data.name);
-		}
-
 		if (column.fieldname === "supplier" && data && data.supplier && data.supplier !== "-") {
 			return po_make_link("supplier", data.supplier);
 		}
 
-		if (column.fieldname === "material_request" && data && data.material_request && data.material_request !== "-") {
-			return po_make_multi_link("material-request", data.material_request);
+		if (column.fieldname === "po_id" && data && data.po_id && data.po_id !== "-") {
+			return po_make_link("purchase-order", data.po_id);
 		}
 
-		if (column.fieldname === "workflow_state" && data && data.workflow_state) {
-			var map = {
-				"Cancelled": { bg: "#fde8e8", color: "#c0392b" },
-				"Completed": { bg: "#e8f8f0", color: "#1a7a4a" },
-				"To Receive and Bill": { bg: "#fff3cd", color: "#856404" },
-				"To Bill": { bg: "#fff7e6", color: "#e67e22" },
-				"To Receive": { bg: "#e6f4ff", color: "#1971c2" },
-				"Draft": { bg: "#f1f3f5", color: "#495057" },
-				"Pending": { bg: "#fff0f6", color: "#c2255c" },
-				"Closed": { bg: "#e8e8e8", color: "#555" },
-				"Approved": { bg: "#e8f8f0", color: "#1a7a4a" },
-				"Rejected": { bg: "#fde8e8", color: "#c0392b" },
-			};
+		if (column.fieldname === "purchase_order" && data && data.purchase_order && data.purchase_order !== "-") {
+			return po_make_multi_link("purchase-order", data.purchase_order);
+		}
 
-			var s = map[data.workflow_state] || { bg: "#f1f3f5", color: "#333" };
-
-			return '<span style="background:' + s.bg + ';color:' + s.color + ';padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">' +
-				po_esc(data.workflow_state) +
-			'</span>';
+		if (column.fieldname === "material_request" && data && data.material_request && data.material_request !== "-") {
+			return po_make_multi_link("material-request", data.material_request);
 		}
 
 		return value;
@@ -94,10 +76,10 @@ frappe.query_reports["Purchase Order Report New"] = {
 
 		po_add_styles();
 
-		report._dp_btn = report.page
+		report._detail_btn = report.page
 			.add_inner_button(__("Detail View") + " (0)", function () {
 				po_read_checked(report);
-				po_fetch_and_render(report);
+				po_fetch_and_open_tab(report);
 			})
 			.addClass("po-detail-btn");
 
@@ -138,15 +120,6 @@ function po_add_styles() {
 		.dt-cell {
 			overflow: visible !important;
 		}
-		.doc-link {
-			color: #111827;
-			text-decoration: none;
-		
-		}
-		.doc-link:hover {
-			text-decoration: underline;
-			
-		}
 	</style>`);
 }
 
@@ -174,8 +147,11 @@ function po_read_checked(report) {
 
 		var rd = report.data[row_idx] || report.data[row_idx - 1];
 
-		if (rd && rd.name) {
-			selected[rd.name] = rd;
+		if (rd) {
+			var po_name = rd.name || rd.po_id || rd.purchase_order;
+			if (po_name) {
+				selected[po_name] = rd;
+			}
 		}
 	});
 
@@ -186,14 +162,14 @@ function po_read_checked(report) {
 function po_update_button(report) {
 	var count = Object.keys(report._po_selected || {}).length;
 
-	if (!report._dp_btn) return;
+	if (!report._detail_btn) return;
 
-	report._dp_btn
+	report._detail_btn
 		.text(__("Detail View") + " (" + count + ")")
 		.toggleClass("active", count > 0);
 }
 
-function po_fetch_and_render(report) {
+function po_fetch_and_open_tab(report) {
 	var po_names = Object.keys(report._po_selected || {});
 
 	if (!po_names.length) {
@@ -222,220 +198,1315 @@ function po_fetch_and_render(report) {
 	});
 }
 
+// function po_open_detail_tab(items, po_names) {
+// 	var meta =
+// 		po_names.length + " PO" + (po_names.length > 1 ? "s" : "") +
+// 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
+
+// 	var report_filters = frappe.query_report ? frappe.query_report.get_filter_values() : {};
+
+// 	var export_items_json = JSON.stringify(items || [])
+// 		.replace(/</g, "\\u003c")
+// 		.replace(/>/g, "\\u003e")
+// 		.replace(/&/g, "\\u0026");
+
+// 	var export_filters_json = JSON.stringify(report_filters || {})
+// 		.replace(/</g, "\\u003c")
+// 		.replace(/>/g, "\\u003e")
+// 		.replace(/&/g, "\\u0026");
+
+// 	var html = `
+// <!doctype html>
+// <html>
+// <head>
+// 	<title>Purchase Order Item Details</title>
+// 	<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+// 	<style>
+// 		body {
+// 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+// 			margin: 0;
+// 			color: #1f272e;
+// 			background: #fff;
+// 			font-size: 14px;
+// 		}
+
+// 		.page {
+// 			padding: 16px 24px;
+// 		}
+
+// 		.report-card {
+// 			border: 1px solid #e5e7eb;
+// 			border-radius: 8px;
+// 			overflow: hidden;
+// 			background: #fff;
+// 		}
+
+// 		.report-header {
+// 			padding: 14px 16px 10px;
+// 			border-bottom: 1px solid #eef0f2;
+// 		}
+
+// 		.title {
+// 			font-size: 18px;
+// 			font-weight: 700;
+// 			margin-bottom: 4px;
+// 			color: #0f172a;
+// 		}
+
+// 		.meta {
+// 			font-size: 13px;
+// 			color: #64748b;
+// 			font-weight: 600;
+// 		}
+
+// 		.filter-row {
+// 			display: grid;
+// 			grid-template-columns: 180px 220px 280px 1fr auto auto;
+// 			gap: 10px;
+// 			align-items: center;
+// 			padding: 10px 12px;
+// 			background: #fff;
+// 		}
+
+// 		.filter-row input {
+// 			height: 28px;
+// 			border: 0;
+// 			background: #f3f4f6;
+// 			border-radius: 7px;
+// 			padding: 4px 10px;
+// 			font-size: 13px;
+// 			outline: none;
+// 			color: #111827;
+// 		}
+
+// 		.filter-row input:focus {
+// 			background: #fff;
+// 			box-shadow: 0 0 0 2px #d1d5db;
+// 		}
+
+// 		.filter-row button {
+// 			height: 28px;
+// 			border: 1px solid #d1d5db;
+// 			background: #fff;
+// 			border-radius: 6px;
+// 			padding: 3px 12px;
+// 			font-size: 13px;
+// 			font-weight: 600;
+// 			cursor: pointer;
+// 			color: #111827;
+// 		}
+
+// 		.filter-row button:hover {
+// 			background: #f8fafc;
+// 		}
+
+// 		.table-wrap {
+// 			overflow: auto;
+// 			max-height: calc(100vh - 135px);
+// 			border-top: 1px solid #eef0f2;
+// 		}
+
+// 		table {
+// 			width: 100%;
+// 			border-collapse: collapse;
+// 			table-layout: fixed;
+// 		}
+
+// 		th,
+// 		td {
+// 			border-right: 1px solid #e5e7eb;
+// 			border-bottom: 1px solid #e5e7eb;
+// 			padding: 8px;
+// 			font-size: 13px;
+// 			vertical-align: middle;
+// 			white-space: nowrap;
+// 			overflow: hidden;
+// 			text-overflow: ellipsis;
+// 		}
+
+// 		th {
+// 			background: #f3f4f6;
+// 			color: #111827;
+// 			text-align: left;
+// 			font-weight: 600;
+// 			position: sticky;
+// 			top: 0;
+// 			z-index: 2;
+// 		}
+
+// 		td:last-child,
+// 		th:last-child {
+// 			border-right: 0;
+// 		}
+
+// 		.text-right {
+// 			text-align: right;
+// 		}
+
+// 		.doc-link {
+// 			color: #111827;
+// 			text-decoration: none;
+// 			font-weight: 600;
+// 		}
+
+// 		.doc-link:hover {
+// 			text-decoration: underline;
+// 		}
+
+// 		.muted {
+// 			color: #6b7280;
+// 		}
+
+// 		.empty {
+// 			padding: 16px;
+// 			color: #6b7280;
+// 			font-weight: 600;
+// 		}
+
+// 		.count-pill {
+// 			position: fixed;
+// 			left: 50%;
+// 			bottom: 12px;
+// 			transform: translateX(-50%);
+// 			background: #4b5563;
+// 			color: #fff;
+// 			border-radius: 6px;
+// 			padding: 6px 14px;
+// 			font-size: 13px;
+// 			opacity: .92;
+// 		}
+
+// 		.po-parent-row td {
+// 			background: #f3f4f6;
+// 			font-weight: 700;
+// 			color: #111827;
+// 		}
+
+// 		.col-no { width: 55px; }
+// 		.col-mr { width: 210px; }
+// 		.col-supplier { width: 260px; }
+// 		.col-item { width: 260px; }
+// 		.col-group { width: 150px; }
+// 		.col-qty { width: 100px; }
+// 		.col-uom { width: 80px; }
+// 		.col-rate { width: 130px; }
+// 		.col-amount { width: 150px; }
+
+// 		.flat-print-export {
+// 			display: none;
+// 		}
+
+// 		@media print {
+// 			@page {
+// 				size: A3 landscape;
+// 				margin: 5mm;
+// 			}
+
+// 			body.print-flat .report-header,
+// 			body.print-flat .filter-row,
+// 			body.print-flat .count-pill,
+// 			body.print-flat .table-wrap,
+// 			body.print-flat .no-print {
+// 				display: none !important;
+// 			}
+
+// 			body.print-flat .flat-print-export {
+// 				display: block !important;
+// 			}
+
+// 			body.print-flat .page {
+// 				padding: 0 !important;
+// 			}
+
+// 			body.print-flat .report-card {
+// 				border: 0 !important;
+// 				border-radius: 0 !important;
+// 				overflow: visible !important;
+// 			}
+
+// 			body.print-flat .flat-title {
+// 				font-size: 13px !important;
+// 				font-weight: 700 !important;
+// 				margin-bottom: 5px !important;
+// 				color: #000 !important;
+// 			}
+
+// 			body.print-flat .flat-filter-table {
+// 				width: 45% !important;
+// 				border-collapse: collapse !important;
+// 				margin-bottom: 8px !important;
+// 			}
+
+// 			body.print-flat .flat-filter-table td {
+// 				border: 1px solid #d1d5db !important;
+// 				font-size: 7px !important;
+// 				padding: 3px !important;
+// 				white-space: normal !important;
+// 				color: #000 !important;
+// 			}
+
+// 			body.print-flat .flat-data-table {
+// 				width: 100% !important;
+// 				border-collapse: collapse !important;
+// 				table-layout: fixed !important;
+// 			}
+
+// 			body.print-flat .flat-data-table th,
+// 			body.print-flat .flat-data-table td {
+// 				border: 1px solid #d1d5db !important;
+// 				font-size: 5px !important;
+// 				line-height: 1.15 !important;
+// 				padding: 2px !important;
+// 				white-space: normal !important;
+// 				word-break: break-word !important;
+// 				overflow: visible !important;
+// 				text-overflow: clip !important;
+// 				color: #000 !important;
+// 			}
+
+// 			body.print-flat .flat-data-table th {
+// 				background: #f3f4f6 !important;
+// 				font-weight: 700 !important;
+// 			}
+// 		}
+// 	</style>
+// </head>
+
+// <body>
+// 	<div class="page">
+// 		<div class="report-card">
+// 			<div class="report-header">
+// 				<div class="title">Purchase Order Item Details</div>
+// 				<div class="meta">${po_esc(meta)}</div>
+// 			</div>
+
+// 			<div class="filter-row no-print">
+// 				<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">
+// 				<input id="filter-mr" placeholder="Material Request ID" oninput="filterDetailTable()">
+// 				<input id="filter-item" placeholder="Item / Supplier / Group" oninput="filterDetailTable()">
+// 				<div></div>
+// 				<button class="no-print" onclick="printFlatExport()">PDF / Print</button>
+// 				<button class="no-print" onclick="downloadExcel()">Excel</button>
+// 			</div>
+
+// 			<div class="table-wrap">
+// 				${po_make_item_table_for_new_tab(items)}
+// 			</div>
+
+// 			<div id="flat-print-export" class="flat-print-export"></div>
+// 		</div>
+// 	</div>
+
+// 	<div class="count-pill no-print" id="row-count"></div>
+
+// 	<script>
+// 		var EXPORT_ITEMS = ${export_items_json};
+// 		var EXPORT_FILTERS = ${export_filters_json};
+
+// 		function htmlEsc(value) {
+// 			return String(value == null ? "" : value)
+// 				.replace(/&/g, "&amp;")
+// 				.replace(/</g, "&lt;")
+// 				.replace(/>/g, "&gt;")
+// 				.replace(/"/g, "&quot;")
+// 				.replace(/'/g, "&#039;");
+// 		}
+
+// 		function getValue(id) {
+// 			var el = document.getElementById(id);
+// 			return el ? (el.value || "").toLowerCase().trim() : "";
+// 		}
+
+// 		function inputValue(id) {
+// 			var el = document.getElementById(id);
+// 			return el ? (el.value || "").trim() : "";
+// 		}
+
+// 		function updateCount() {
+// 			var rows = document.querySelectorAll("tbody tr.po-item-row");
+// 			var visible = 0;
+
+// 			rows.forEach(function (row) {
+// 				if (row.style.display !== "none") visible++;
+// 			});
+
+// 			document.getElementById("row-count").textContent = visible + " rows selected";
+// 		}
+
+// 		function filterDetailTable() {
+// 			var po = getValue("filter-po");
+// 			var mr = getValue("filter-mr");
+// 			var item = getValue("filter-item");
+
+// 			var parents = document.querySelectorAll("tbody tr.po-parent-row");
+
+// 			parents.forEach(function (parentRow) {
+// 				var poId = parentRow.getAttribute("data-po") || "";
+// 				var childRows = document.querySelectorAll('tbody tr.po-item-row[data-parent="' + poId + '"]');
+
+// 				var parentVisible = false;
+
+// 				childRows.forEach(function (row) {
+// 					var poText = (row.getAttribute("data-po") || "").toLowerCase();
+// 					var mrText = (row.getAttribute("data-mr") || "").toLowerCase();
+// 					var searchText = (row.getAttribute("data-search") || "").toLowerCase();
+
+// 					var show = true;
+
+// 					if (po && poText.indexOf(po) === -1) show = false;
+// 					if (mr && mrText.indexOf(mr) === -1) show = false;
+// 					if (item && searchText.indexOf(item) === -1) show = false;
+
+// 					row.style.display = show ? "" : "none";
+// 					row.classList.toggle("hidden-print", !show);
+
+// 					if (show) parentVisible = true;
+// 				});
+
+// 				parentRow.style.display = parentVisible ? "" : "none";
+// 				parentRow.classList.toggle("hidden-print", !parentVisible);
+// 			});
+
+// 			updateCount();
+// 		}
+
+// 		function exportValue(value) {
+// 			return value == null || value === "" ? "-" : String(value);
+// 		}
+
+// 		function exportNumber(value) {
+// 			var num = Number(value || 0);
+// 			return num.toLocaleString("en-IN");
+// 		}
+
+// 		function exportMoney(value) {
+// 			var num = Number(value || 0);
+// 			return num.toLocaleString("en-IN", {
+// 				minimumFractionDigits: 2,
+// 				maximumFractionDigits: 2
+// 			});
+// 		}
+
+// 		function getFilterRows() {
+// 			var rows = [];
+
+// 			rows.push(["From Date", EXPORT_FILTERS.from_date || "-"]);
+// 			rows.push(["To Date", EXPORT_FILTERS.to_date || "-"]);
+// 			rows.push(["Company", EXPORT_FILTERS.company || "-"]);
+// 			rows.push(["Supplier", EXPORT_FILTERS.supplier || "-"]);
+// 			rows.push(["Status", EXPORT_FILTERS.status || "-"]);
+
+// 			var poFilter = inputValue("filter-po");
+// 			var mrFilter = inputValue("filter-mr");
+// 			var itemFilter = inputValue("filter-item");
+
+// 			if (poFilter) rows.push(["PO ID Filter", poFilter]);
+// 			if (mrFilter) rows.push(["Material Request Filter", mrFilter]);
+// 			if (itemFilter) rows.push(["Item / Supplier / Group Filter", itemFilter]);
+
+// 			return rows;
+// 		}
+
+// 		function itemPassesFilter(it) {
+// 			var poFilter = inputValue("filter-po").toLowerCase();
+// 			var mrFilter = inputValue("filter-mr").toLowerCase();
+// 			var itemFilter = inputValue("filter-item").toLowerCase();
+
+// 			var poText = String(it.po_id || it.purchase_order || it.parent || "").toLowerCase();
+// 			var mrText = String(it.material_request || "").toLowerCase();
+
+// 			var searchText = [
+// 				it.po_id,
+// 				it.purchase_order,
+// 				it.parent,
+// 				it.material_request,
+// 				it.company,
+// 				it.supplier,
+// 				it.status,
+// 				it.item_code,
+// 				it.item_name,
+// 				it.item_group
+// 			].join(" ").toLowerCase();
+
+// 			if (poFilter && poText.indexOf(poFilter) === -1) return false;
+// 			if (mrFilter && mrText.indexOf(mrFilter) === -1) return false;
+// 			if (itemFilter && searchText.indexOf(itemFilter) === -1) return false;
+
+// 			return true;
+// 		}
+
+// 		function buildFlatExportRows() {
+// 			var rows = [];
+
+// 			getFilterRows().forEach(function (r) {
+// 				rows.push(r);
+// 			});
+
+// 			rows.push([]);
+
+// 			rows.push([
+// 				"PO ID",
+// 				"Date",
+// 				"Company",
+// 				"Supplier",
+// 				"Required By",
+// 				"PO Grand Total",
+// 				"PO Net Total",
+// 				"PO Total Qty",
+// 				"Status",
+// 				"Item No.",
+// 				"Material Request",
+// 				"Item Code",
+// 				"Item Name",
+// 				"Item Group",
+// 				"Quantity",
+// 				"UOM",
+// 				"Rate",
+// 				"Item Amount"
+// 			]);
+
+// 			EXPORT_ITEMS.forEach(function (it, index) {
+// 				if (!itemPassesFilter(it)) return;
+
+// 				rows.push([
+// 					exportValue(it.po_id || it.purchase_order || it.parent),
+// 					exportValue(it.date || it.transaction_date || it.posting_date),
+// 					exportValue(it.company),
+// 					exportValue(it.supplier),
+// 					exportValue(it.required_by || it.schedule_date),
+// 					exportMoney(it.po_grand_total || it.grand_total),
+// 					exportMoney(it.po_net_total || it.net_total),
+// 					exportNumber(it.po_total_qty || it.total_qty),
+// 					exportValue(it.status),
+// 					exportValue(it.idx || index + 1),
+// 					exportValue(it.material_request),
+// 					exportValue(it.item_code),
+// 					exportValue(it.item_name || it.item_code),
+// 					exportValue(it.item_group),
+// 					exportNumber(it.qty),
+// 					exportValue(it.uom),
+// 					exportMoney(it.rate),
+// 					exportMoney(it.amount)
+// 				]);
+// 			});
+
+// 			return rows;
+// 		}
+
+// 		function buildFlatPrintHtml() {
+// 			var rows = buildFlatExportRows();
+// 			var filterRows = getFilterRows();
+
+// 			var headerIndex = 0;
+
+// 			for (var i = 0; i < rows.length; i++) {
+// 				if (rows[i].length > 2) {
+// 					headerIndex = i;
+// 					break;
+// 				}
+// 			}
+
+// 			var html = "";
+
+// 			html += '<div class="flat-title">Purchase Order Parent Child Export</div>';
+
+// 			html += '<table class="flat-filter-table">';
+// 			filterRows.forEach(function (r) {
+// 				html += '<tr>';
+// 				html += '<td><b>' + htmlEsc(r[0]) + '</b></td>';
+// 				html += '<td>' + htmlEsc(r[1]) + '</td>';
+// 				html += '</tr>';
+// 			});
+// 			html += '</table>';
+
+// 			html += '<table class="flat-data-table">';
+// 			html += '<thead><tr>';
+
+// 			rows[headerIndex].forEach(function (cell) {
+// 				html += '<th>' + htmlEsc(cell) + '</th>';
+// 			});
+
+// 			html += '</tr></thead>';
+// 			html += '<tbody>';
+
+// 			for (var j = headerIndex + 1; j < rows.length; j++) {
+// 				html += '<tr>';
+
+// 				rows[j].forEach(function (cell) {
+// 					html += '<td>' + htmlEsc(cell) + '</td>';
+// 				});
+
+// 				html += '</tr>';
+// 			}
+
+// 			html += '</tbody></table>';
+
+// 			return html;
+// 		}
+
+// 		function printFlatExport() {
+// 			document.body.classList.add("print-flat");
+// 			document.getElementById("flat-print-export").innerHTML = buildFlatPrintHtml();
+
+// 			setTimeout(function () {
+// 				window.print();
+// 			}, 200);
+
+// 			setTimeout(function () {
+// 				document.body.classList.remove("print-flat");
+// 			}, 1500);
+// 		}
+
+// 		function downloadExcel() {
+// 			var rows = buildFlatExportRows();
+
+// 			if (typeof XLSX === "undefined") {
+// 				downloadCsv(rows);
+// 				return;
+// 			}
+
+// 			var ws = XLSX.utils.aoa_to_sheet(rows);
+
+// 			var headerIndex = 0;
+
+// 			for (var i = 0; i < rows.length; i++) {
+// 				if (rows[i].length > 2) {
+// 					headerIndex = i;
+// 					break;
+// 				}
+// 			}
+
+// 			ws["!autofilter"] = {
+// 				ref: XLSX.utils.encode_range({
+// 					s: { r: headerIndex, c: 0 },
+// 					e: { r: Math.max(rows.length - 1, headerIndex), c: 17 }
+// 				})
+// 			};
+
+// 			ws["!cols"] = [
+// 				{ wch: 24 },
+// 				{ wch: 14 },
+// 				{ wch: 28 },
+// 				{ wch: 32 },
+// 				{ wch: 14 },
+// 				{ wch: 16 },
+// 				{ wch: 16 },
+// 				{ wch: 14 },
+// 				{ wch: 14 },
+// 				{ wch: 10 },
+// 				{ wch: 24 },
+// 				{ wch: 18 },
+// 				{ wch: 28 },
+// 				{ wch: 18 },
+// 				{ wch: 12 },
+// 				{ wch: 10 },
+// 				{ wch: 14 },
+// 				{ wch: 16 }
+// 			];
+
+// 			var wb = XLSX.utils.book_new();
+// 			XLSX.utils.book_append_sheet(wb, ws, "Parent Child Export");
+// 			XLSX.writeFile(wb, "purchase_order_parent_child_export.xlsx");
+// 		}
+
+// 		function csvCell(value) {
+// 			var q = String.fromCharCode(34);
+// 			return q + String(value == null ? "" : value).replace(/"/g, q + q) + q;
+// 		}
+
+// 		function downloadCsv(rows) {
+// 			var csvRows = [];
+
+// 			rows.forEach(function (row) {
+// 				csvRows.push(row.map(csvCell).join(","));
+// 			});
+
+// 			var csv = "\\ufeff" + csvRows.join("\\n");
+// 			var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+// 			var a = document.createElement("a");
+// 			a.href = URL.createObjectURL(blob);
+// 			a.download = "purchase_order_parent_child_export.csv";
+// 			document.body.appendChild(a);
+// 			a.click();
+// 			document.body.removeChild(a);
+// 		}
+
+// 		updateCount();
+// 	</script>
+// </body>
+// </html>
+// `;
+
+// 	var new_tab = window.open("", "_blank");
+
+// 	if (!new_tab) {
+// 		frappe.msgprint(__("Please allow pop-ups for this site to open Detail View in a new tab."));
+// 		return;
+// 	}
+
+// 	new_tab.document.open();
+// 	new_tab.document.write(html);
+// 	new_tab.document.close();
+// }
+
 function po_open_detail_tab(items, po_names) {
 	var meta =
 		po_names.length + " PO" + (po_names.length > 1 ? "s" : "") +
 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
 
-	var html =
-		'<!doctype html>' +
-		'<html>' +
-		'<head>' +
-			'<title>Purchase Order Item Details</title>' +
-			'<style>' +
-				'*{box-sizing:border-box;}' +
-				'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;color:#1f272e;background:#fff;font-size:14px;}' +
-				'.page{padding:16px 24px;}' +
-				'.report-card{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;}' +
-				'.report-header{padding:14px 16px 10px;border-bottom:1px solid #eef0f2;}' +
-				'.title{font-size:18px;font-weight:700;margin-bottom:4px;color:#0f172a;}' +
-				'.meta{font-size:13px;color:#64748b;font-weight:600;}' +
+	var report_filters = frappe.query_report ? frappe.query_report.get_filter_values() : {};
 
-				'.filter-row{display:grid;grid-template-columns:170px 210px 260px 1fr auto auto;gap:10px;align-items:center;padding:10px 12px;background:#fff;}' +
-				'.filter-row input{height:30px;border:0;background:#f3f4f6;border-radius:7px;padding:4px 10px;font-size:13px;outline:none;color:#111827;}' +
-				'.filter-row input:focus{background:#fff;box-shadow:0 0 0 2px #d1d5db;}' +
-				'.filter-row button{height:30px;border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:3px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#111827;}' +
-				'.filter-row button:hover{background:#f8fafc;}' +
+	var export_items_json = JSON.stringify(items || [])
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
 
-				'.table-wrap{overflow:auto;max-height:calc(100vh - 135px);border-top:1px solid #eef0f2;}' +
-				'table{width:100%;min-width:1080px;border-collapse:collapse;table-layout:fixed;}' +
-				'th,td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:8px;font-size:13px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-				'th{background:#f3f4f6;color:#111827;text-align:left;font-weight:600;position:sticky;top:0;z-index:2;}' +
-				'td:last-child,th:last-child{border-right:0;}' +
-				'.text-right{text-align:right;}' +
-				'.amount-cell{color:#111827;}' +
-				'.po-group-row td{background:#f3f4f6;font-weight:700;color:#111827;padding:10px 8px!important;}' +
-				'.group-count{margin-left:10px;color:#6b7280;font-size:12px;font-weight:700;}' +
-				'.doc-link{color:#111827;text-decoration:none;}' +
-				'.doc-link:hover{text-decoration:underline;}' +
-				'.muted{color:#6b7280;}' +
-				'.empty{padding:16px;color:#6b7280;font-weight:600;}' +
-				'.count-pill{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:#4b5563;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;opacity:.92;}' +
+	var export_filters_json = JSON.stringify(report_filters || {})
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
 
-				'.col-no{width:55px;}' +
-				'.col-mr{width:190px;}' +
-				'.col-supplier{width:190px;}' +
-				'.col-item{width:190px;}' +
-				'.col-group{width:130px;}' +
-				'.col-qty{width:110px;}' +
-				'.col-uom{width:90px;}' +
-				'.col-rate{width:130px;}' +
-				'.col-amount{width:150px;}' +
+	var html = `
+<!doctype html>
+<html>
+<head>
+	<title>Purchase Order Item Details</title>
+	<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"><\/script>
 
-				'@media screen and (max-width:768px){' +
-					'.page{padding:10px;}' +
-					'.filter-row{grid-template-columns:1fr;}' +
-					'.table-wrap{max-height:calc(100vh - 230px);}' +
-				'}' +
+	<style>
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+			margin: 0;
+			color: #1f272e;
+			background: #fff;
+			font-size: 14px;
+		}
 
-				'@media print{' +
-					'@page{size:A4 landscape;margin:6mm;}' +
-					'html,body{width:auto!important;height:auto!important;background:#fff!important;margin:0!important;padding:0!important;}' +
-					'body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}' +
-					'.filter-row,.count-pill,.no-print{display:none!important;}' +
-					'.page{padding:0!important;}' +
-					'.report-card{border:0!important;border-radius:0!important;overflow:visible!important;}' +
-					'.report-header{padding:0 0 6px 0!important;}' +
-					'.title{font-size:13px!important;margin-bottom:2px!important;}' +
-					'.meta{font-size:9px!important;}' +
-					'.table-wrap{max-height:none!important;overflow:visible!important;border-top:1px solid #eef0f2!important;}' +
-					'table{width:100%!important;min-width:0!important;table-layout:fixed!important;border-collapse:collapse!important;}' +
-					'th{position:static!important;}' +
-					'th,td{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;word-break:break-word!important;font-size:7px!important;line-height:1.2!important;padding:2px!important;}' +
-					'.po-group-row td{font-size:8px!important;padding:3px!important;}' +
-					'.col-no{width:4%!important;}' +
-					'.col-mr{width:16%!important;}' +
-					'.col-supplier{width:16%!important;}' +
-					'.col-item{width:20%!important;}' +
-					'.col-group{width:12%!important;}' +
-					'.col-qty{width:7%!important;}' +
-					'.col-uom{width:5%!important;}' +
-					'.col-rate{width:9%!important;}' +
-					'.col-amount{width:11%!important;}' +
-					'tr.hidden-print{display:none!important;}' +
-					'a{color:#000!important;text-decoration:none!important;}' +
-				'}' +
-			'</style>' +
-		'</head>' +
-		'<body>' +
-			'<div class="page">' +
-				'<div class="report-card">' +
-					'<div class="report-header">' +
-						'<div class="title">Purchase Order Item Details</div>' +
-						'<div class="meta">' + po_esc(meta) + '</div>' +
-					'</div>' +
+		.page {
+			padding: 16px 24px;
+		}
 
-					'<div class="filter-row no-print">' +
-						'<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">' +
-						'<input id="filter-mr" placeholder="Material Request ID" oninput="filterDetailTable()">' +
-						'<input id="filter-item" placeholder="Item / Supplier / Group" oninput="filterDetailTable()">' +
-						'<div></div>' +
-						'<button class="no-print" onclick="window.print()">PDF / Print</button>' +
-						'<button class="no-print" onclick="downloadExcel()">Excel</button>' +
-					'</div>' +
+		.report-card {
+			border: 1px solid #e5e7eb;
+			border-radius: 8px;
+			overflow: hidden;
+			background: #fff;
+		}
 
-					'<div class="table-wrap">' +
-						po_make_item_table_for_new_tab(items) +
-					'</div>' +
-				'</div>' +
-			'</div>' +
+		.report-header {
+			padding: 14px 16px 10px;
+			border-bottom: 1px solid #eef0f2;
+		}
 
-			'<div class="count-pill no-print" id="row-count"></div>' +
+		.title {
+			font-size: 18px;
+			font-weight: 700;
+			margin-bottom: 4px;
+			color: #0f172a;
+		}
 
-			'<script>' +
-				'function getValue(id){return (document.getElementById(id).value||"").toLowerCase().trim();}' +
+		.meta {
+			font-size: 13px;
+			color: #64748b;
+			font-weight: 600;
+		}
 
-				'function updateCount(){' +
-					'var rows=document.querySelectorAll("tbody tr.po-item-row");' +
-					'var visible=0;' +
-					'rows.forEach(function(row){if(row.style.display!=="none") visible++;});' +
-					'document.getElementById("row-count").textContent=visible+" rows selected";' +
-				'}' +
+		.filter-row {
+			display: grid;
+			grid-template-columns: 180px 220px 280px 1fr auto auto;
+			gap: 10px;
+			align-items: center;
+			padding: 10px 12px;
+			background: #fff;
+		}
 
-				'function filterDetailTable(){' +
-					'var po=getValue("filter-po");' +
-					'var mr=getValue("filter-mr");' +
-					'var search=getValue("filter-item");' +
-					'var groups=document.querySelectorAll("tr.po-group-row");' +
+		.filter-row input {
+			height: 28px;
+			border: 0;
+			background: #f3f4f6;
+			border-radius: 7px;
+			padding: 4px 10px;
+			font-size: 13px;
+			outline: none;
+			color: #111827;
+		}
 
-					'groups.forEach(function(group){' +
-						'var poId=(group.getAttribute("data-po")||"").toLowerCase();' +
-						'var next=group.nextElementSibling;' +
-						'var visibleCount=0;' +
+		.filter-row input:focus {
+			background: #fff;
+			box-shadow: 0 0 0 2px #d1d5db;
+		}
 
-						'while(next && !next.classList.contains("po-group-row")){' +
-							'var mrText=(next.getAttribute("data-mr")||"").toLowerCase();' +
-							'var searchText=(next.getAttribute("data-search")||"").toLowerCase();' +
-							'var show=true;' +
-							'if(po && poId.indexOf(po)===-1) show=false;' +
-							'if(mr && mrText.indexOf(mr)===-1) show=false;' +
-							'if(search && searchText.indexOf(search)===-1) show=false;' +
-							'next.style.display=show ? "" : "none";' +
-							'next.classList.toggle("hidden-print", !show);' +
-							'if(show) visibleCount++;' +
-							'next=next.nextElementSibling;' +
-						'}' +
+		.filter-row button {
+			height: 28px;
+			border: 1px solid #d1d5db;
+			background: #fff;
+			border-radius: 6px;
+			padding: 3px 12px;
+			font-size: 13px;
+			font-weight: 600;
+			cursor: pointer;
+			color: #111827;
+		}
 
-						'group.style.display=visibleCount ? "" : "none";' +
-						'group.classList.toggle("hidden-print", !visibleCount);' +
-					'});' +
+		.filter-row button:hover {
+			background: #f8fafc;
+		}
 
-					'updateCount();' +
-				'}' +
+		.table-wrap {
+			overflow: auto;
+			max-height: calc(100vh - 135px);
+			border-top: 1px solid #eef0f2;
+		}
 
-				'var detailItems = ' + JSON.stringify(items).replace(/</g, "\\u003c") + ';' +
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			table-layout: fixed;
+		}
 
-				'function csvCell(value){var q=String.fromCharCode(34);return q+String(value==null?"":value).replace(/"/g,q+q)+q;}' +
+		th,
+		td {
+			border-right: 1px solid #e5e7eb;
+			border-bottom: 1px solid #e5e7eb;
+			padding: 8px;
+			font-size: 13px;
+			vertical-align: middle;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
 
-				'function downloadExcel(){' +
-					'var po=getValue("filter-po");' +
-					'var mr=getValue("filter-mr");' +
-					'var search=getValue("filter-item");' +
-					'var rows=[[' +
-						'"PO ID","Date","Company","Supplier","Required By","PO Grand Total","PO Net Total","PO Total Qty","Status","Item No.","Material Request ID","Item Code","Item Name","Item Group","Quantity","UOM","Rate","Item Amount"' +
-					']];' +
+		th {
+			background: #f3f4f6;
+			color: #111827;
+			text-align: left;
+			font-weight: 600;
+			position: sticky;
+			top: 0;
+			z-index: 2;
+		}
 
-					'detailItems.forEach(function(it){' +
-						'var poId=String(it.po_id || it.parent || "");' +
-						'var mrText=String(it.material_request || "").toLowerCase();' +
-						'var searchText=[' +
-							'it.supplier || "",' +
-							'it.material_request || "",' +
-							'it.item_code || "",' +
-							'it.item_name || "",' +
-							'it.item_group || ""' +
-						'].join(" ").toLowerCase();' +
+		td:last-child,
+		th:last-child {
+			border-right: 0;
+		}
 
-						'if(po && poId.toLowerCase().indexOf(po)===-1) return;' +
-						'if(mr && mrText.indexOf(mr)===-1) return;' +
-						'if(search && searchText.indexOf(search)===-1) return;' +
+		.text-right {
+			text-align: right;
+		}
 
-						'rows.push([' +
-							'poId,' +
-							'it.date || "",' +
-							'it.company || "",' +
-							'it.supplier || "",' +
-							'it.required_by || "",' +
-							'it.grand_total || 0,' +
-							'it.net_total || 0,' +
-							'it.total_qty || 0,' +
-							'it.workflow_state || "",' +
-							'it.idx || "",' +
-							'it.material_request || "",' +
-							'it.item_code || "",' +
-							'it.item_name || "",' +
-							'it.item_group || "",' +
-							'it.qty || 0,' +
-							'it.uom || "",' +
-							'it.rate || 0,' +
-							'it.amount || 0' +
-						']);' +
-					'});' +
+		.doc-link {
+			color: #111827;
+			text-decoration: none;
+			font-weight: 600;
+		}
 
-					'var csv="\\ufeff"+rows.map(function(row){return row.map(csvCell).join(",");}).join("\\n");' +
-					'var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});' +
-					'var a=document.createElement("a");' +
-					'a.href=URL.createObjectURL(blob);' +
-					'a.download="purchase_order_item_details.csv";' +
-					'document.body.appendChild(a);' +
-					'a.click();' +
-					'document.body.removeChild(a);' +
-				'}' +
+		.doc-link:hover {
+			text-decoration: underline;
+		}
 
-				'updateCount();' +
-			'</script>' +
-		'</body>' +
-		'</html>';
+		.muted {
+			color: #6b7280;
+		}
+
+		.empty {
+			padding: 16px;
+			color: #6b7280;
+			font-weight: 600;
+		}
+
+		.count-pill {
+			position: fixed;
+			left: 50%;
+			bottom: 12px;
+			transform: translateX(-50%);
+			background: #4b5563;
+			color: #fff;
+			border-radius: 6px;
+			padding: 6px 14px;
+			font-size: 13px;
+			opacity: .92;
+		}
+
+		.po-parent-row td {
+			background: #f3f4f6;
+			font-weight: 700;
+			color: #111827;
+		}
+
+		.col-no { width: 55px; }
+		.col-mr { width: 210px; }
+		.col-supplier { width: 260px; }
+		.col-item { width: 260px; }
+		.col-group { width: 150px; }
+		.col-qty { width: 100px; }
+		.col-uom { width: 80px; }
+		.col-rate { width: 130px; }
+		.col-amount { width: 150px; }
+
+		.flat-print-export {
+			display: none;
+		}
+
+		@media print {
+			@page {
+				size: A3 landscape;
+				margin: 5mm;
+			}
+
+			body.print-flat .report-header,
+			body.print-flat .filter-row,
+			body.print-flat .count-pill,
+			body.print-flat .table-wrap,
+			body.print-flat .no-print {
+				display: none !important;
+			}
+
+			body.print-flat .flat-print-export {
+				display: block !important;
+			}
+
+			body.print-flat .page {
+				padding: 0 !important;
+			}
+
+			body.print-flat .report-card {
+				border: 0 !important;
+				border-radius: 0 !important;
+				overflow: visible !important;
+			}
+
+			body.print-flat .flat-title {
+				font-size: 13px !important;
+				font-weight: 700 !important;
+				margin-bottom: 5px !important;
+				color: #000 !important;
+			}
+
+			body.print-flat .flat-filter-table {
+				width: 45% !important;
+				border-collapse: collapse !important;
+				margin-bottom: 8px !important;
+			}
+
+			body.print-flat .flat-filter-table td {
+				border: 1px solid #d1d5db !important;
+				font-size: 7px !important;
+				padding: 3px !important;
+				white-space: normal !important;
+				color: #000 !important;
+			}
+
+			body.print-flat .flat-data-table {
+				width: 100% !important;
+				border-collapse: collapse !important;
+				table-layout: fixed !important;
+			}
+
+			body.print-flat .flat-data-table th,
+			body.print-flat .flat-data-table td {
+				border: 1px solid #d1d5db !important;
+				font-size: 5px !important;
+				line-height: 1.15 !important;
+				padding: 2px !important;
+				white-space: normal !important;
+				word-break: break-word !important;
+				overflow: visible !important;
+				text-overflow: clip !important;
+				color: #000 !important;
+			}
+
+			body.print-flat .flat-data-table th {
+				background: #f3f4f6 !important;
+				font-weight: 700 !important;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="page">
+		<div class="report-card">
+			<div class="report-header">
+				<div class="title">Purchase Order Item Details</div>
+				<div class="meta">${po_esc(meta)}</div>
+			</div>
+
+			<div class="filter-row no-print">
+				<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">
+				<input id="filter-mr" placeholder="Material Request ID" oninput="filterDetailTable()">
+				<input id="filter-item" placeholder="Item / Supplier / Group" oninput="filterDetailTable()">
+				<div></div>
+				<button class="no-print" onclick="printFlatExport()">PDF / Print</button>
+				<button class="no-print" onclick="downloadExcel()">Excel</button>
+			</div>
+
+			<div class="table-wrap">
+				${po_make_item_table_for_new_tab(items)}
+			</div>
+
+			<div id="flat-print-export" class="flat-print-export"></div>
+		</div>
+	</div>
+
+	<div class="count-pill no-print" id="row-count"></div>
+
+	<script>
+		var EXPORT_ITEMS = ${export_items_json};
+		var EXPORT_FILTERS = ${export_filters_json};
+
+		function htmlEsc(value) {
+			return String(value == null ? "" : value)
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/"/g, "&quot;")
+				.replace(/'/g, "&#039;");
+		}
+
+		function getValue(id) {
+			var el = document.getElementById(id);
+			return el ? (el.value || "").toLowerCase().trim() : "";
+		}
+
+		function inputValue(id) {
+			var el = document.getElementById(id);
+			return el ? (el.value || "").trim() : "";
+		}
+
+		function updateCount() {
+			var rows = document.querySelectorAll("tbody tr.po-item-row");
+			var visible = 0;
+
+			rows.forEach(function (row) {
+				if (row.style.display !== "none") visible++;
+			});
+
+			document.getElementById("row-count").textContent = visible + " rows selected";
+		}
+
+		function filterDetailTable() {
+			var po = getValue("filter-po");
+			var mr = getValue("filter-mr");
+			var item = getValue("filter-item");
+
+			var rows = document.querySelectorAll("tbody tr.po-item-row");
+
+			rows.forEach(function (row) {
+				var poText = (row.getAttribute("data-po") || "").toLowerCase();
+				var mrText = (row.getAttribute("data-mr") || "").toLowerCase();
+				var searchText = (row.getAttribute("data-search") || "").toLowerCase();
+
+				var show = true;
+
+				if (po && poText.indexOf(po) === -1) show = false;
+				if (mr && mrText.indexOf(mr) === -1) show = false;
+				if (item && searchText.indexOf(item) === -1) show = false;
+
+				row.style.display = show ? "" : "none";
+				row.classList.toggle("hidden-print", !show);
+			});
+
+			updateCount();
+		}
+		function exportValue(value) {
+			return value == null || value === "" ? "-" : String(value);
+		}
+
+		function exportNumber(value) {
+			var num = Number(value || 0);
+			return num.toLocaleString("en-IN");
+		}
+
+		function exportMoney(value) {
+			var num = Number(value || 0);
+			return num.toLocaleString("en-IN", {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2
+			});
+		}
+   
+
+		function exportDate(value) {
+			if (!value) return "-";
+
+			var s = String(value);
+
+			if (s.indexOf(" ") !== -1) {
+				s = s.split(" ")[0];
+			}
+
+			if (s.indexOf("-") !== -1) {
+				var parts = s.split("-");
+				if (parts.length === 3) {
+					return parts[2] + "/" + parts[1] + "/" + parts[0];
+				}
+			}
+
+			if (s.indexOf("/") !== -1) {
+				return s;
+			}
+
+			return s;
+		}
+
+
+		function addFilterIfFilled(rows, label, value) {
+			if (
+				value !== undefined &&
+				value !== null &&
+				String(value).trim() !== "" &&
+				String(value).trim() !== "-"
+			) {
+				rows.push([label, value]);
+			}
+		}
+
+		function getFilterRows() {
+			var rows = [];
+
+			addFilterIfFilled(rows, "PO ID", EXPORT_FILTERS.po_id || EXPORT_FILTERS.name);
+			addFilterIfFilled(rows, "Material Request", EXPORT_FILTERS.material_request);
+			addFilterIfFilled(rows, "Company", EXPORT_FILTERS.company);
+			addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
+			addFilterIfFilled(rows, "To Date", exportDate(EXPORT_FILTERS.to_date));
+			addFilterIfFilled(rows, "Supplier", EXPORT_FILTERS.supplier);
+			addFilterIfFilled(rows, "Status", EXPORT_FILTERS.status || EXPORT_FILTERS.workflow_state);
+
+			addFilterIfFilled(rows, "Detail PO Filter", inputValue("filter-po"));
+			addFilterIfFilled(rows, "Detail Material Request Filter", inputValue("filter-mr"));
+			addFilterIfFilled(rows, "Detail Item / Supplier / Group Filter", inputValue("filter-item"));
+
+			return rows;
+		}
+
+		function itemPassesFilter(it) {
+			var poFilter = inputValue("filter-po").toLowerCase();
+			var mrFilter = inputValue("filter-mr").toLowerCase();
+			var itemFilter = inputValue("filter-item").toLowerCase();
+
+			var poText = String(it.po_id || it.purchase_order || it.parent || "").toLowerCase();
+			var mrText = String(it.material_request || "").toLowerCase();
+
+			var searchText = [
+				it.po_id,
+				it.purchase_order,
+				it.parent,
+				it.material_request,
+				it.company,
+				it.supplier,
+				it.workflow_state,
+				it.status,
+				it.item_code,
+				it.item_name,
+				it.item_group
+			].join(" ").toLowerCase();
+
+			if (poFilter && poText.indexOf(poFilter) === -1) return false;
+			if (mrFilter && mrText.indexOf(mrFilter) === -1) return false;
+			if (itemFilter && searchText.indexOf(itemFilter) === -1) return false;
+
+			return true;
+		}
+
+		function buildFlatExportRows() {
+			var rows = [];
+			var filterRows = getFilterRows();
+
+			filterRows.forEach(function (r) {
+				rows.push(r);
+			});
+
+			if (filterRows.length) {
+				rows.push([]);
+			}
+
+			rows.push([
+				"Date",
+				"PO ID",
+				"Company",
+				"Supplier",
+				"Required By",
+				"PO Grand Total",
+				"PO Net Total",
+				"PO Total Qty",
+				"Status",
+				"Material Request",
+				"Item Name",
+				"Item Group",
+				"Quantity",
+				"UOM",
+				"Rate",
+				"Total Amount"
+			]);
+
+			EXPORT_ITEMS.forEach(function (it, index) {
+				if (!itemPassesFilter(it)) return;
+
+				rows.push([
+					exportDate(it.date || it.transaction_date || it.posting_date),
+					exportValue(it.po_id || it.purchase_order || it.parent),
+					exportValue(it.company),
+					exportValue(it.supplier),
+					exportDate(it.required_by || it.schedule_date),
+					exportMoney(it.grand_total),
+					exportMoney(it.net_total),
+					exportNumber(it.total_qty),
+					exportValue(it.workflow_state || it.status),
+					
+					exportValue(it.material_request),
+					exportValue(it.item_name || it.item_code),
+					exportValue(it.item_group),
+					exportNumber(it.qty),
+					exportValue(it.uom),
+					exportMoney(it.rate),
+					exportMoney(it.amount)
+				]);
+			});
+
+			return rows;
+		}
+
+		function getHeaderIndex(rows) {
+			for (var i = 0; i < rows.length; i++) {
+				if (rows[i].length > 2) {
+					return i;
+				}
+			}
+			return 0;
+		}
+
+		function buildFlatPrintHtml() {
+			var rows = buildFlatExportRows();
+			var filterRows = getFilterRows();
+			var headerIndex = getHeaderIndex(rows);
+			var html = "";
+
+			html += '<div class="flat-title">Purchase Order Parent Child Export</div>';
+
+			if (filterRows.length) {
+				html += '<table class="flat-filter-table">';
+				filterRows.forEach(function (r) {
+					html += '<tr>';
+					html += '<td><b>' + htmlEsc(r[0]) + '</b></td>';
+					html += '<td>' + htmlEsc(r[1]) + '</td>';
+					html += '</tr>';
+				});
+				html += '</table>';
+			}
+
+			html += '<table class="flat-data-table">';
+			html += '<thead><tr>';
+
+			rows[headerIndex].forEach(function (cell) {
+				html += '<th>' + htmlEsc(cell) + '</th>';
+			});
+
+			html += '</tr></thead>';
+			html += '<tbody>';
+
+			for (var j = headerIndex + 1; j < rows.length; j++) {
+				if (!rows[j].length) continue;
+
+				html += '<tr>';
+
+				rows[j].forEach(function (cell) {
+					html += '<td>' + htmlEsc(cell) + '</td>';
+				});
+
+				html += '</tr>';
+			}
+
+			html += '</tbody></table>';
+
+			return html;
+		}
+
+		function printFlatExport() {
+			document.body.classList.add("print-flat");
+			document.getElementById("flat-print-export").innerHTML = buildFlatPrintHtml();
+
+			setTimeout(function () {
+				window.print();
+			}, 200);
+
+			setTimeout(function () {
+				document.body.classList.remove("print-flat");
+			}, 1500);
+		}
+
+		function downloadExcel() {
+			var rows = buildFlatExportRows();
+
+			if (typeof XLSX === "undefined") {
+				downloadCsv(rows);
+				return;
+			}
+
+			var ws = XLSX.utils.aoa_to_sheet(rows);
+			var headerIndex = getHeaderIndex(rows);
+
+			ws["!autofilter"] = {
+				ref: XLSX.utils.encode_range({
+					s: { r: headerIndex, c: 0 },
+					e: { r: Math.max(rows.length - 1, headerIndex), c: 15 }
+				})
+			};
+
+			ws["!cols"] = [
+			{ wch: 24 },
+			{ wch: 14 },
+			{ wch: 28 },
+			{ wch: 32 },
+			{ wch: 14 },
+			{ wch: 16 },
+			{ wch: 16 },
+			{ wch: 14 },
+			{ wch: 14 },
+			{ wch: 24 },
+			{ wch: 28 },
+			{ wch: 18 },
+			{ wch: 12 },
+			{ wch: 10 },
+			{ wch: 14 },
+			{ wch: 16 }
+		];
+
+			var wb = XLSX.utils.book_new();
+			XLSX.utils.book_append_sheet(wb, ws, "Parent Child Export");
+			XLSX.writeFile(wb, "purchase_order_parent_child_export.xlsx");
+		}
+
+		function csvCell(value) {
+			var q = String.fromCharCode(34);
+			return q + String(value == null ? "" : value).replace(/"/g, q + q) + q;
+		}
+
+		function downloadCsv(rows) {
+			var csvRows = [];
+
+			rows.forEach(function (row) {
+				csvRows.push(row.map(csvCell).join(","));
+			});
+
+			var csv = "\\ufeff" + csvRows.join("\\n");
+			var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+			var a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = "purchase_order_parent_child_export.csv";
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}
+
+		updateCount();
+	<\/script>
+</body>
+</html>
+`;
 
 	var new_tab = window.open("", "_blank");
 
@@ -449,76 +1520,60 @@ function po_open_detail_tab(items, po_names) {
 	new_tab.document.close();
 }
 
+
+
 function po_make_item_table_for_new_tab(items) {
 	if (!items.length) {
 		return '<div class="empty">No Purchase Order Item rows found.</div>';
 	}
 
-	var by_po = {};
+	var rows = items.map(function (it, index) {
+		var po_id = it.po_id || it.purchase_order || it.parent || "";
+		var material_request = it.material_request || "";
+		var supplier = it.supplier || "";
+		var item_code = it.item_code || "";
+		var item_name = it.item_name || item_code || "";
+		var item_group = it.item_group || "";
+		var qty = po_fmt_num(it.qty);
+		var uom = it.uom || "";
+		var rate = po_fmt_money(it.rate);
+		var amount = po_fmt_money(it.amount);
 
-	items.forEach(function (it) {
-		var po_id = it.po_id || it.parent || "-";
+		var search_text = [
+			po_id,
+			material_request,
+			supplier,
+			item_code,
+			item_name,
+			item_group
+		].join(" ");
 
-		if (!by_po[po_id]) {
-			by_po[po_id] = [];
-		}
+		return '' +
+			'<tr class="po-item-row" ' +
+				'data-parent="' + po_esc(po_id) + '" ' +
+				'data-po="' + po_esc(po_id) + '" ' +
+				'data-mr="' + po_esc(material_request) + '" ' +
+				'data-search="' + po_esc(search_text) + '">' +
 
-		by_po[po_id].push(it);
-	});
-
-	var rows = "";
-
-	Object.keys(by_po).forEach(function (po_id) {
-		var po_items = by_po[po_id];
-
-		rows += '' +
-			'<tr class="po-group-row" data-po="' + po_esc(po_id) + '">' +
-				'<td colspan="9">' +
-					(po_id && po_id !== "-"
-						? '<a class="doc-link" href="/app/purchase-order/' + encodeURIComponent(po_id) + '" target="_blank">' + po_esc(po_id) + '</a>'
+				'<td class="text-right col-no">' + (index + 1) + '</td>' +
+				'<td class="col-mr">' + po_make_multi_link("material-request", material_request) + '</td>' +
+				'<td class="col-supplier" title="' + po_esc(supplier) + '">' + po_make_link("supplier", supplier) + '</td>' +
+				'<td class="col-item" title="' + po_esc(item_name) + '">' +
+					(item_name
+						? '<a class="doc-link" href="/app/item/' + encodeURIComponent(item_code || item_name) + '" target="_blank">' + po_esc(item_name) + '</a>'
 						: '<span class="muted">-</span>') +
-					'<span class="group-count">' + po_items.length + ' item' + (po_items.length !== 1 ? 's' : '') + '</span>' +
 				'</td>' +
+				'<td class="col-group" title="' + po_esc(item_group) + '">' +
+					(item_group
+						? '<a class="doc-link" href="/app/item-group/' + encodeURIComponent(item_group) + '" target="_blank">' + po_esc(item_group) + '</a>'
+						: '<span class="muted">-</span>') +
+				'</td>' +
+				'<td class="text-right col-qty">' + po_esc(qty) + '</td>' +
+				'<td class="col-uom">' + po_esc(uom || "-") + '</td>' +
+				'<td class="text-right col-rate">Rs. ' + po_esc(rate) + '</td>' +
+				'<td class="text-right col-amount">Rs. ' + po_esc(amount) + '</td>' +
 			'</tr>';
-
-		rows += po_items.map(function (it, index) {
-			var material_request = it.material_request || "";
-			var supplier = it.supplier || "";
-			var item_code = it.item_code || "";
-			var item_name = it.item_name || item_code || "";
-			var item_group = it.item_group || "";
-			var qty = po_fmt_num(it.qty);
-			var uom = it.uom || "";
-			var rate = po_fmt_money(it.rate);
-			var amount = po_fmt_money(it.amount);
-			var search_text = [material_request, supplier, item_code, item_name, item_group].join(" ");
-
-			return '' +
-				'<tr class="po-item-row" data-po="' + po_esc(po_id) + '" data-mr="' + po_esc(material_request) + '" data-search="' + po_esc(search_text) + '">' +
-					'<td class="text-right col-no">' + (index + 1) + '</td>' +
-					'<td class="col-mr" title="' + po_esc(material_request) + '">' +
-						po_make_multi_link("material-request", material_request) +
-					'</td>' +
-					'<td class="col-supplier" title="' + po_esc(supplier) + '">' +
-						po_make_link("supplier", supplier) +
-					'</td>' +
-					'<td class="col-item" title="' + po_esc(item_name) + '">' +
-						(item_name
-							? '<a class="doc-link" href="/app/item/' + encodeURIComponent(item_code || item_name) + '" target="_blank">' + po_esc(item_name) + '</a>'
-							: '<span class="muted">-</span>') +
-					'</td>' +
-					'<td class="col-group" title="' + po_esc(item_group) + '">' +
-						(item_group
-							? '<a class="doc-link" href="/app/item-group/' + encodeURIComponent(item_group) + '" target="_blank">' + po_esc(item_group) + '</a>'
-							: '<span class="muted">-</span>') +
-					'</td>' +
-					'<td class="text-right col-qty">' + po_esc(qty) + '</td>' +
-					'<td class="col-uom">' + po_esc(uom || "-") + '</td>' +
-					'<td class="text-right col-rate">Rs. ' + po_esc(rate) + '</td>' +
-					'<td class="text-right col-amount amount-cell">Rs. ' + po_esc(amount) + '</td>' +
-				'</tr>';
-		}).join("");
-	});
+	}).join("");
 
 	return '' +
 		'<table>' +
@@ -532,7 +1587,7 @@ function po_make_item_table_for_new_tab(items) {
 					'<th class="text-right col-qty">Quantity</th>' +
 					'<th class="col-uom">UOM</th>' +
 					'<th class="text-right col-rate">Rate</th>' +
-					'<th class="text-right col-amount amount-cell">Total Amount</th>' +
+					'<th class="text-right col-amount">Total Amount</th>' +
 				'</tr>' +
 			'</thead>' +
 			'<tbody>' + rows + '</tbody>' +

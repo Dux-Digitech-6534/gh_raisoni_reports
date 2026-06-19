@@ -190,134 +190,665 @@ function pr_open_detail_tab(items, receipt_names) {
 		receipt_names.length + " Receipt" + (receipt_names.length > 1 ? "s" : "") +
 		", " + items.length + " item" + (items.length !== 1 ? "s" : "");
 
-	var html =
-		'<!doctype html>' +
-		'<html>' +
-		'<head>' +
-			'<title>Purchase Receipt Item Details</title>' +
-			'<style>' +
-				'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;color:#1f272e;background:#fff;font-size:14px;}' +
-				'.page{padding:16px 24px;}' +
-				'.report-card{border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff;}' +
-				'.report-header{padding:14px 16px 10px;border-bottom:1px solid #eef0f2;}' +
-				'.title{font-size:18px;font-weight:700;margin-bottom:4px;color:#0f172a;}' +
-				'.meta{font-size:13px;color:#64748b;font-weight:600;}' +
-				'.filter-row{display:grid;grid-template-columns:190px 260px 1fr auto auto;gap:10px;align-items:center;padding:10px 12px;background:#fff;}' +
-				'.filter-row input{height:28px;border:0;background:#f3f4f6;border-radius:7px;padding:4px 10px;font-size:13px;outline:none;color:#111827;}' +
-				'.filter-row input:focus{background:#fff;box-shadow:0 0 0 2px #d1d5db;}' +
-				'.filter-row button{height:28px;border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:3px 12px;font-size:13px;font-weight:600;cursor:pointer;color:#111827;}' +
-				'.filter-row button:hover{background:#f8fafc;}' +
-				'.table-wrap{overflow:auto;max-height:calc(100vh - 135px);border-top:1px solid #eef0f2;}' +
-				'table{width:100%;border-collapse:collapse;table-layout:fixed;}' +
-				'th,td{border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:8px;font-size:13px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-				'th{background:#f3f4f6;color:#111827;text-align:left;font-weight:600;position:sticky;top:0;z-index:2;}' +
-				'td:last-child,th:last-child{border-right:0;}' +
-				'.text-right{text-align:right;}' +
-				'.amount-cell{color:#111827;}' +
-				'.doc-link{color:#111827;text-decoration:none;font-weight:600;}' +
-				'.doc-link:hover{text-decoration:underline;}' +
-				'.muted{color:#6b7280;}' +
-				'.item-img{width:54px;height:42px;border:1px solid #e5e7eb;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#9ca3af;font-size:10px;}' +
-				'.item-img img{width:100%;height:100%;object-fit:cover;}' +
-				'.empty{padding:16px;color:#6b7280;font-weight:600;}' +
-				'.count-pill{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:#4b5563;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;opacity:.92;}' +
-				'.col-no{width:55px;}.col-receipt{width:180px;}.col-supplier{width:190px;}.col-pi{width:190px;}.col-expense{width:190px;}.col-item{width:170px;}.col-group{width:120px;}.col-qty{width:100px;}.col-uom{width:80px;}.col-rate{width:120px;}.col-amount{width:140px;}' +
-				'@media print{' +
-					'@page{size:A4 landscape;margin:6mm;}' +
-					'html,body{width:auto!important;height:auto!important;background:#fff!important;margin:0!important;padding:0!important;}' +
-					'.filter-row,.count-pill,.no-print{display:none!important;}' +
-					'.page{padding:0!important;}' +
-					'.report-card{border:0!important;border-radius:0!important;overflow:visible!important;}' +
-					'.report-header{padding:0 0 6px 0!important;}' +
-					'.title{font-size:13px!important;margin-bottom:2px!important;}' +
-					'.meta{font-size:9px!important;}' +
-					'.table-wrap{max-height:none!important;overflow:visible!important;border-top:1px solid #eef0f2!important;}' +
-					'table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;}' +
-					'th{position:static!important;}' +
-					'th,td{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;word-break:break-word!important;font-size:6.5px!important;line-height:1.2!important;padding:2px!important;}' +
-					'.print-hide{display:none!important;}' +
-                    '.col-no{width:4%!important;}.col-receipt{width:12%!important;}.col-supplier{width:14%!important;}.col-pi{width:13%!important;}.col-expense{width:13%!important;}.col-item{width:13%!important;}.col-group{width:9%!important;}.col-qty{width:6%!important;}.col-uom{width:5%!important;}.col-rate{width:5%!important;}.col-amount{width:6%!important;}' + 					'tr.hidden-print{display:none!important;}' +
-					'a{color:#000!important;text-decoration:none!important;}' +
-				'}' +
-			'</style>' +
-		'</head>' +
-		'<body>' +
-			'<div class="page">' +
-				'<div class="report-card">' +
-					'<div class="report-header">' +
-						'<div class="title">Purchase Receipt Item Details</div>' +
-						'<div class="meta">' + pr_esc(meta) + '</div>' +
-					'</div>' +
+	var report_filters = frappe.query_report ? frappe.query_report.get_filter_values() : {};
 
-					'<div class="filter-row no-print">' +
-						'<input id="filter-receipt" placeholder="Receipt ID" oninput="filterDetailTable()">' +
-						'<input id="filter-item" placeholder="Item / Supplier / Group" oninput="filterDetailTable()">' +
-						'<div></div>' +
-						'<button class="no-print" onclick="window.print()">PDF / Print</button>' +
-						'<button class="no-print" onclick="downloadExcel()">Excel</button>' +
-					'</div>' +
+	var export_items_json = JSON.stringify(items || [])
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
 
-					'<div class="table-wrap">' +
-						pr_make_item_table_for_new_tab(items) +
-					'</div>' +
-				'</div>' +
-			'</div>' +
+	var export_filters_json = JSON.stringify(report_filters || {})
+		.replace(/</g, "\\u003c")
+		.replace(/>/g, "\\u003e")
+		.replace(/&/g, "\\u0026");
 
-			'<div class="count-pill no-print" id="row-count"></div>' +
+	var html = `
+<!doctype html>
+<html>
+<head>
+	<title>Purchase Receipt Item Details</title>
+	<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"><\/script>
 
-			'<script>' +
-				'function getValue(id){return (document.getElementById(id).value||"").toLowerCase().trim();}' +
+	<style>
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+			margin: 0;
+			color: #1f272e;
+			background: #fff;
+			font-size: 14px;
+		}
 
-				'function updateCount(){' +
-					'var rows=document.querySelectorAll("tbody tr.pr-item-row");' +
-					'var visible=0;' +
-					'rows.forEach(function(row){if(row.style.display!=="none") visible++;});' +
-					'document.getElementById("row-count").textContent=visible+" rows selected";' +
-				'}' +
+		.page {
+			padding: 16px 24px;
+		}
 
-				'function filterDetailTable(){' +
-					'var receipt=getValue("filter-receipt");' +
-					'var item=getValue("filter-item");' +
-					'var rows=document.querySelectorAll("tbody tr.pr-item-row");' +
-					'rows.forEach(function(row){' +
-						'var receiptText=(row.getAttribute("data-receipt")||"").toLowerCase();' +
-						'var searchText=(row.getAttribute("data-search")||"").toLowerCase();' +
-						'var show=true;' +
-						'if(receipt && receiptText.indexOf(receipt)===-1) show=false;' +
-						'if(item && searchText.indexOf(item)===-1) show=false;' +
-						'row.style.display=show ? "" : "none";' +
-						'row.classList.toggle("hidden-print", !show);' +
-					'});' +
-					'updateCount();' +
-				'}' +
+		.report-card {
+			border: 1px solid #e5e7eb;
+			border-radius: 8px;
+			overflow: hidden;
+			background: #fff;
+		}
 
-				'function csvCell(value){var q=String.fromCharCode(34);return q+String(value==null?"":value).replace(/"/g,q+q)+q;}' +
+		.report-header {
+			padding: 14px 16px 10px;
+			border-bottom: 1px solid #eef0f2;
+		}
 
-				'function downloadExcel(){' +
-					'var rows=[];' +
-					'document.querySelectorAll("table tr").forEach(function(tr){' +
-						'if(tr.style.display==="none" || tr.classList.contains("hidden-print")) return;' +
-						'var cols=[];' +
-						'tr.querySelectorAll("th,td").forEach(function(cell){' +
-							'if(cell.classList.contains("export-hide")) return;' +
-							'cols.push(csvCell((cell.innerText||"").trim()));' +
-						'});' +
-						'rows.push(cols.join(","));' +
-					'});' +
-					'var csv="\\ufeff"+rows.join("\\n");' +
-					'var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});' +
-					'var a=document.createElement("a");' +
-					'a.href=URL.createObjectURL(blob);' +
-					'a.download="purchase_receipt_item_details.csv";' +
-					'document.body.appendChild(a);' +
-					'a.click();' +
-					'document.body.removeChild(a);' +
-				'}' +
+		.title {
+			font-size: 18px;
+			font-weight: 700;
+			margin-bottom: 4px;
+			color: #0f172a;
+		}
 
-				'updateCount();' +
-			'</script>' +
-		'</body>' +
-		'</html>';
+		.meta {
+			font-size: 13px;
+			color: #64748b;
+			font-weight: 600;
+		}
+
+		.filter-row {
+			display: grid;
+			grid-template-columns: 190px 190px 260px 1fr auto auto;
+			gap: 10px;
+			align-items: center;
+			padding: 10px 12px;
+			background: #fff;
+		}
+
+		.filter-row input {
+			height: 28px;
+			border: 0;
+			background: #f3f4f6;
+			border-radius: 7px;
+			padding: 4px 10px;
+			font-size: 13px;
+			outline: none;
+			color: #111827;
+		}
+
+		.filter-row input:focus {
+			background: #fff;
+			box-shadow: 0 0 0 2px #d1d5db;
+		}
+
+		.filter-row button {
+			height: 28px;
+			border: 1px solid #d1d5db;
+			background: #fff;
+			border-radius: 6px;
+			padding: 3px 12px;
+			font-size: 13px;
+			font-weight: 600;
+			cursor: pointer;
+			color: #111827;
+		}
+
+		.filter-row button:hover {
+			background: #f8fafc;
+		}
+
+		.table-wrap {
+			overflow: auto;
+			max-height: calc(100vh - 135px);
+			border-top: 1px solid #eef0f2;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			table-layout: fixed;
+		}
+
+		th,
+		td {
+			border-right: 1px solid #e5e7eb;
+			border-bottom: 1px solid #e5e7eb;
+			padding: 8px;
+			font-size: 13px;
+			vertical-align: middle;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		th {
+			background: #f3f4f6;
+			color: #111827;
+			text-align: left;
+			font-weight: 600;
+			position: sticky;
+			top: 0;
+			z-index: 2;
+		}
+
+		td:last-child,
+		th:last-child {
+			border-right: 0;
+		}
+
+		.text-right {
+			text-align: right;
+		}
+
+		.amount-cell {
+			color: #111827;
+		}
+
+		.doc-link {
+			color: #111827;
+			text-decoration: none;
+			font-weight: 600;
+		}
+
+		.doc-link:hover {
+			text-decoration: underline;
+		}
+
+		.muted {
+			color: #6b7280;
+		}
+
+		.empty {
+			padding: 16px;
+			color: #6b7280;
+			font-weight: 600;
+		}
+
+		.count-pill {
+			position: fixed;
+			left: 50%;
+			bottom: 12px;
+			transform: translateX(-50%);
+			background: #4b5563;
+			color: #fff;
+			border-radius: 6px;
+			padding: 6px 14px;
+			font-size: 13px;
+			opacity: .92;
+		}
+
+		.flat-print-export {
+			display: none;
+		}
+
+		.flat-export-title {
+			font-size: 14px;
+			font-weight: 700;
+			margin-bottom: 6px;
+			color: #000;
+		}
+
+		.flat-export-filters {
+			font-size: 10px;
+			margin-bottom: 8px;
+			font-weight: 600;
+			color: #000;
+		}
+
+		.col-no { width: 55px; }
+		.col-receipt { width: 180px; }
+		.col-supplier { width: 190px; }
+		.col-pi { width: 190px; }
+		.col-expense { width: 190px; }
+		.col-item { width: 170px; }
+		.col-group { width: 120px; }
+		.col-qty { width: 100px; }
+		.col-uom { width: 80px; }
+		.col-rate { width: 120px; }
+		.col-amount { width: 140px; }
+
+		@media print {
+			@page {
+				size: A4 landscape;
+				margin: 6mm;
+			}
+
+			html,
+			body {
+				width: auto !important;
+				height: auto !important;
+				background: #fff !important;
+				margin: 0 !important;
+				padding: 0 !important;
+			}
+
+			body.print-flat .filter-row,
+			body.print-flat .count-pill,
+			body.print-flat .no-print,
+			body.print-flat .table-wrap,
+			body.print-flat .report-header {
+				display: none !important;
+			}
+
+			body.print-flat .page {
+				padding: 0 !important;
+			}
+
+			body.print-flat .report-card {
+				border: 0 !important;
+				border-radius: 0 !important;
+				overflow: visible !important;
+			}
+
+			body.print-flat .flat-print-export {
+				display: block !important;
+			}
+
+			body.print-flat .flat-print-export table {
+				width: 100% !important;
+				table-layout: fixed !important;
+				border-collapse: collapse !important;
+			}
+
+			body.print-flat .flat-print-export th,
+			body.print-flat .flat-print-export td {
+				border: 1px solid #d1d5db !important;
+				white-space: normal !important;
+				overflow: visible !important;
+				text-overflow: clip !important;
+				word-break: break-word !important;
+				font-size: 5.5px !important;
+				line-height: 1.2 !important;
+				padding: 2px !important;
+				color: #000 !important;
+			}
+
+			body.print-flat .flat-print-export th {
+				background: #f3f4f6 !important;
+				font-weight: 700 !important;
+			}
+
+			body.print-flat .flat-export-title {
+				font-size: 13px !important;
+				font-weight: 700 !important;
+				margin-bottom: 4px !important;
+			}
+
+			body.print-flat .flat-export-filters {
+				font-size: 8px !important;
+				margin-bottom: 6px !important;
+				font-weight: 600 !important;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="page">
+		<div class="report-card">
+			<div class="report-header">
+				<div class="title">Purchase Receipt Item Details</div>
+				<div class="meta">${pr_esc(meta)}</div>
+			</div>
+
+			<div class="filter-row no-print">
+				<input id="filter-receipt" placeholder="Receipt ID" oninput="filterDetailTable()">
+				<input id="filter-po" placeholder="PO ID" oninput="filterDetailTable()">
+				<input id="filter-item" placeholder="Item / Supplier / Group" oninput="filterDetailTable()">
+				<div></div>
+				<button class="no-print" onclick="printFlatExport()">PDF / Print</button>
+				<button class="no-print" onclick="downloadExcel()">Excel</button>
+			</div>
+
+			<div class="table-wrap">
+				${pr_make_item_table_for_new_tab(items)}
+			</div>
+
+			<div id="flat-print-export" class="flat-print-export"></div>
+		</div>
+	</div>
+
+	<div class="count-pill no-print" id="row-count"></div>
+
+	<script>
+		var EXPORT_ITEMS = ${export_items_json};
+		var EXPORT_FILTERS = ${export_filters_json};
+
+		function htmlEsc(value) {
+			return String(value == null ? "" : value)
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/"/g, "&quot;")
+				.replace(/'/g, "&#039;");
+		}
+
+		function getValue(id) {
+			var el = document.getElementById(id);
+			return el ? (el.value || "").toLowerCase().trim() : "";
+		}
+
+		function exportInputValue(id) {
+			var el = document.getElementById(id);
+			return el ? (el.value || "").trim() : "";
+		}
+
+		function updateCount() {
+			var rows = document.querySelectorAll("tbody tr.pr-item-row");
+			var visible = 0;
+
+			rows.forEach(function (row) {
+				if (row.style.display !== "none") visible++;
+			});
+
+			document.getElementById("row-count").textContent = visible + " rows selected";
+		}
+
+		function filterDetailTable() {
+			var receipt = getValue("filter-receipt");
+			var po = getValue("filter-po");
+			var item = getValue("filter-item");
+
+			var rows = document.querySelectorAll("tbody tr.pr-item-row");
+
+			rows.forEach(function (row) {
+				var receiptText = (row.getAttribute("data-receipt") || "").toLowerCase();
+				var poText = (row.getAttribute("data-po") || "").toLowerCase();
+				var searchText = (row.getAttribute("data-search") || "").toLowerCase();
+
+				var show = true;
+
+				if (receipt && receiptText.indexOf(receipt) === -1) show = false;
+				if (po && poText.indexOf(po) === -1) show = false;
+				if (item && searchText.indexOf(item) === -1) show = false;
+
+				row.style.display = show ? "" : "none";
+				row.classList.toggle("hidden-print", !show);
+			});
+
+			updateCount();
+		}
+
+		function displayValue(value) {
+			return value == null || value === "" ? "-" : String(value);
+		}
+
+		function numberValue(value) {
+			var num = Number(value || 0);
+			return num.toLocaleString("en-IN");
+		}
+
+		function moneyValue(value) {
+			var num = Number(value || 0);
+			return num.toLocaleString("en-IN", {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2
+			});
+		}
+
+		function exportDate(value) {
+				if (!value) return "-";
+
+				var s = String(value);
+
+				if (s.indexOf(" ") !== -1) {
+					s = s.split(" ")[0];
+				}
+
+				if (s.indexOf("-") !== -1) {
+					var parts = s.split("-");
+					if (parts.length === 3) {
+						return parts[2] + "/" + parts[1] + "/" + parts[0];
+					}
+				}
+
+				if (s.indexOf("/") !== -1) {
+					return s;
+				}
+
+				return s;
+			}
+
+		function addFilterIfFilled(rows, label, value) {
+			if (
+				value !== undefined &&
+				value !== null &&
+				String(value).trim() !== "" &&
+				String(value).trim() !== "-"
+			) {
+				rows.push([label, value]);
+			}
+		}
+
+		function getFilterRows() {
+			var rows = [];
+
+			addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
+            addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
+			addFilterIfFilled(rows, "Company", EXPORT_FILTERS.company);
+			addFilterIfFilled(rows, "Supplier", EXPORT_FILTERS.supplier);
+			addFilterIfFilled(rows, "Status", EXPORT_FILTERS.status);
+
+			addFilterIfFilled(rows, "Purchase Receipt No", exportInputValue("filter-receipt"));
+			addFilterIfFilled(rows, "Purchase Order ID", exportInputValue("filter-po"));
+			addFilterIfFilled(rows, "Detail Item / Supplier / Group Filter", exportInputValue("filter-item"));
+
+			return rows;
+		}
+
+		function itemMatchesExportFilters(it) {
+			var receiptFilter = exportInputValue("filter-receipt").toLowerCase();
+			var poFilter = exportInputValue("filter-po").toLowerCase();
+			var itemFilter = exportInputValue("filter-item").toLowerCase();
+
+			var receiptNo = String(it.receipt_id || it.purchase_receipt || it.parent || "").toLowerCase();
+			var poNo = String(it.purchase_order || "").toLowerCase();
+
+			var searchText = [
+				it.receipt_id,
+				it.purchase_receipt,
+				it.parent,
+				it.purchase_order,
+				it.material_request,
+				it.purchase_invoice_details,
+				it.company,
+				it.supplier,
+				it.status,
+				it.item_code,
+				it.item_name,
+				it.item_group
+			].join(" ").toLowerCase();
+
+			if (receiptFilter && receiptNo.indexOf(receiptFilter) === -1) return false;
+			if (poFilter && poNo.indexOf(poFilter) === -1) return false;
+			if (itemFilter && searchText.indexOf(itemFilter) === -1) return false;
+
+			return true;
+		}
+
+		function buildFlatExportRows() {
+			var rows = [];
+			var filterRows = getFilterRows();
+
+			filterRows.forEach(function (r) {
+				rows.push(r);
+			});
+
+			if (filterRows.length) {
+				rows.push([]);
+			}
+
+			rows.push([
+				"Date",
+				"Purchase Receipt No.",
+				"Purchase Order",
+				"Material Request",
+				"Purchase Invoice ID",
+				"Company",
+				"Supplier",
+				"Grand Total",
+				"Status",
+				"Item Code",
+				"Item Name",
+				"Item Group",
+				"Quantity",
+				"UOM",
+				"Rate",
+				"Total Amount"
+			]);
+
+			EXPORT_ITEMS.forEach(function (it) {
+				if (!itemMatchesExportFilters(it)) return;
+
+				rows.push([
+					exportDate(it.date || it.posting_date),
+					displayValue(it.receipt_id || it.purchase_receipt || it.parent),
+					displayValue(it.purchase_order),
+					displayValue(it.material_request),
+					displayValue(it.purchase_invoice_details),
+					displayValue(it.company),
+					displayValue(it.supplier),
+					moneyValue(it.grand_total),
+					displayValue(it.status),
+					displayValue(it.item_code),
+					displayValue(it.item_name || it.item_code),
+					displayValue(it.item_group),
+					numberValue(it.qty),
+					displayValue(it.uom),
+					moneyValue(it.rate),
+					moneyValue(it.amount)
+				]);
+			});
+
+			return rows;
+		}
+
+		function getHeaderIndex(rows) {
+			for (var i = 0; i < rows.length; i++) {
+				if (rows[i].length > 2) {
+					return i;
+				}
+			}
+			return 0;
+		}
+
+		function buildFlatPrintHtml() {
+			var rows = buildFlatExportRows();
+			var filterRows = getFilterRows();
+			var headerIndex = getHeaderIndex(rows);
+			var html = "";
+
+			html += '<div class="flat-export-title">Purchase Receipt Parent Child Export</div>';
+
+			if (filterRows.length) {
+				html += '<div class="flat-export-filters">';
+				filterRows.forEach(function (r) {
+					html += '<div><b>' + htmlEsc(r[0]) + ':</b> ' + htmlEsc(r[1]) + '</div>';
+				});
+				html += '</div>';
+			}
+
+			html += '<table>';
+			html += '<thead><tr>';
+
+			rows[headerIndex].forEach(function (cell) {
+				html += '<th>' + htmlEsc(cell) + '</th>';
+			});
+
+			html += '</tr></thead>';
+			html += '<tbody>';
+
+			for (var j = headerIndex + 1; j < rows.length; j++) {
+				if (!rows[j].length) continue;
+
+				html += '<tr>';
+
+				rows[j].forEach(function (cell) {
+					html += '<td>' + htmlEsc(cell) + '</td>';
+				});
+
+				html += '</tr>';
+			}
+
+			html += '</tbody></table>';
+
+			return html;
+		}
+
+		function printFlatExport() {
+			document.body.classList.add("print-flat");
+			document.getElementById("flat-print-export").innerHTML = buildFlatPrintHtml();
+
+			setTimeout(function () {
+				window.print();
+			}, 100);
+
+			setTimeout(function () {
+				document.body.classList.remove("print-flat");
+			}, 1500);
+		}
+
+		function downloadExcel() {
+			var rows = buildFlatExportRows();
+
+			if (typeof XLSX !== "undefined") {
+				var ws = XLSX.utils.aoa_to_sheet(rows);
+				var headerIndex = getHeaderIndex(rows);
+
+				ws["!autofilter"] = {
+					ref: XLSX.utils.encode_range({
+						s: { r: headerIndex, c: 0 },
+						e: { r: Math.max(rows.length - 1, headerIndex), c: 15 }
+					})
+				};
+
+				ws["!cols"] = [
+					{ wch: 14 },
+					{ wch: 24 },
+					{ wch: 24 },
+					{ wch: 24 },
+					{ wch: 26 },
+					{ wch: 32 },
+					{ wch: 30 },
+					{ wch: 16 },
+					{ wch: 14 },
+					{ wch: 18 },
+					{ wch: 32 },
+					{ wch: 20 },
+					{ wch: 12 },
+					{ wch: 10 },
+					{ wch: 14 },
+					{ wch: 16 }
+				];
+
+				var wb = XLSX.utils.book_new();
+				XLSX.utils.book_append_sheet(wb, ws, "Flat Export");
+				XLSX.writeFile(wb, "purchase_receipt_parent_child_export.xlsx");
+				return;
+			}
+
+			downloadCsv(rows);
+		}
+
+		function csvCell(value) {
+			var q = String.fromCharCode(34);
+			return q + String(value == null ? "" : value).replace(/"/g, q + q) + q;
+		}
+
+		function downloadCsv(rows) {
+			var csvRows = [];
+
+			rows.forEach(function (row) {
+				csvRows.push(row.map(csvCell).join(","));
+			});
+
+			var csv = "\\ufeff" + csvRows.join("\\n");
+			var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+			var a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = "purchase_receipt_parent_child_export.csv";
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}
+
+		updateCount();
+	<\/script>
+</body>
+</html>
+`;
 
 	var new_tab = window.open("", "_blank");
 
@@ -339,6 +870,7 @@ function pr_make_item_table_for_new_tab(items) {
 	var rows = items.map(function (it, index) {
 		var receipt_id = it.receipt_id || it.parent || "";
 		var supplier = it.supplier || "";
+		var purchase_order = it.purchase_order || "";
 		var purchase_invoice_details = it.purchase_invoice_details || "";
 		var expense_head = it.expense_head || "";
 		var item_code = it.item_code || "";
@@ -351,6 +883,7 @@ function pr_make_item_table_for_new_tab(items) {
 
 		var search_text = [
 			supplier,
+			purchase_order,
 			purchase_invoice_details,
 			expense_head,
 			item_code,
@@ -359,7 +892,7 @@ function pr_make_item_table_for_new_tab(items) {
 		].join(" ");
 
 		return '' +
-			'<tr class="pr-item-row" data-receipt="' + pr_esc(receipt_id) + '" data-search="' + pr_esc(search_text) + '">' +
+			'<tr class="pr-item-row" data-receipt="' + pr_esc(receipt_id) + '" data-po="' + pr_esc(purchase_order) + '" data-search="' + pr_esc(search_text) + '">' +
 				'<td class="text-right col-no">' + (index + 1) + '</td>' +
 				'<td class="col-receipt">' + pr_make_link("purchase-receipt", receipt_id) + '</td>' +
 				'<td class="col-supplier" title="' + pr_esc(supplier) + '">' + pr_make_link("supplier", supplier) + '</td>' +

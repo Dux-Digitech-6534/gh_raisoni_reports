@@ -615,7 +615,7 @@ function pr_open_detail_tab(items, receipt_names) {
 			var rows = [];
 
 			addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
-            addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
+            addFilterIfFilled(rows, "To Date", exportDate(EXPORT_FILTERS.to_date));
 			addFilterIfFilled(rows, "Company", EXPORT_FILTERS.company);
 			addFilterIfFilled(rows, "Supplier", EXPORT_FILTERS.supplier);
 			addFilterIfFilled(rows, "Status", EXPORT_FILTERS.status);

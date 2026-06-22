@@ -873,7 +873,7 @@ function po_open_detail_tab(items, po_names) {
 <html>
 <head>
 	<title>Purchase Order Item Details</title>
-	<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"><\/script>
+	<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"><\/script>
 
 	<style>
 		body {
@@ -1313,15 +1313,58 @@ function po_open_detail_tab(items, po_names) {
 
 		function buildFlatExportRows() {
 			var rows = [];
-			var filterRows = getFilterRows();
 
-			filterRows.forEach(function (r) {
-				rows.push(r);
-			});
+			var companyValue = EXPORT_FILTERS.company || "-";
+			var fromDateValue = exportDate(EXPORT_FILTERS.from_date);
+			var toDateValue = exportDate(EXPORT_FILTERS.to_date);
 
-			if (filterRows.length) {
-				rows.push([]);
+			// Company center
+			rows.push([companyValue]);
+			rows.push([]);
+
+			// From Date and To Date in center, same row
+			rows.push([
+				"",
+				"",
+				"",
+				"",
+				"",
+				"From Date : " + fromDateValue + "     To Date : " + toDateValue
+			]);
+
+			// Only display filters that have values
+			if (EXPORT_FILTERS.supplier && String(EXPORT_FILTERS.supplier).trim() !== "") {
+				rows.push(["Supplier : " + EXPORT_FILTERS.supplier]);
 			}
+
+			if ((EXPORT_FILTERS.status || EXPORT_FILTERS.workflow_state) && String(EXPORT_FILTERS.status || EXPORT_FILTERS.workflow_state).trim() !== "") {
+				rows.push(["Status : " + (EXPORT_FILTERS.status || EXPORT_FILTERS.workflow_state)]);
+			}
+
+			if ((EXPORT_FILTERS.po_id || EXPORT_FILTERS.name) && String(EXPORT_FILTERS.po_id || EXPORT_FILTERS.name).trim() !== "") {
+				rows.push(["PO ID : " + (EXPORT_FILTERS.po_id || EXPORT_FILTERS.name)]);
+			}
+
+			if (EXPORT_FILTERS.material_request && String(EXPORT_FILTERS.material_request).trim() !== "") {
+				rows.push(["Material Request : " + EXPORT_FILTERS.material_request]);
+			}
+
+			if (inputValue("filter-po")) {
+				rows.push(["PO Filter : " + inputValue("filter-po")]);
+			}
+
+			if (inputValue("filter-mr")) {
+				rows.push(["Material Request Filter : " + inputValue("filter-mr")]);
+			}
+
+			if (inputValue("filter-item")) {
+				var detailValue = inputValue("filter-item");
+				var detailLabel = getDetailFilterLabel(detailValue);
+
+				rows.push([detailLabel + " : " + detailValue]);
+			}
+
+			rows.push([]);
 
 			rows.push([
 				"Date",
@@ -1355,7 +1398,6 @@ function po_open_detail_tab(items, po_names) {
 					exportMoney(it.net_total),
 					exportNumber(it.total_qty),
 					exportValue(it.workflow_state || it.status),
-					
 					exportValue(it.material_request),
 					exportValue(it.item_name || it.item_code),
 					exportValue(it.item_group),
@@ -1371,59 +1413,81 @@ function po_open_detail_tab(items, po_names) {
 
 		function getHeaderIndex(rows) {
 			for (var i = 0; i < rows.length; i++) {
-				if (rows[i].length > 2) {
+				if (rows[i].length > 10 && rows[i][0] === "Date") {
 					return i;
 				}
 			}
 			return 0;
 		}
-
-		function buildFlatPrintHtml() {
-			var rows = buildFlatExportRows();
-			var filterRows = getFilterRows();
+		function applyExcelTopCenterStyle(ws, rows) {
 			var headerIndex = getHeaderIndex(rows);
-			var html = "";
+			var merges = [];
 
-			html += '<div class="flat-title">Purchase Order Parent Child Export</div>';
-
-			if (filterRows.length) {
-				html += '<table class="flat-filter-table">';
-				filterRows.forEach(function (r) {
-					html += '<tr>';
-					html += '<td><b>' + htmlEsc(r[0]) + '</b></td>';
-					html += '<td>' + htmlEsc(r[1]) + '</td>';
-					html += '</tr>';
-				});
-				html += '</table>';
-			}
-
-			html += '<table class="flat-data-table">';
-			html += '<thead><tr>';
-
-			rows[headerIndex].forEach(function (cell) {
-				html += '<th>' + htmlEsc(cell) + '</th>';
+			// Company full center: A to P
+			merges.push({
+				s: { r: 0, c: 0 },
+				e: { r: 0, c: 15 }
 			});
 
-			html += '</tr></thead>';
-			html += '<tbody>';
+			// From Date + To Date together: F to I
+			merges.push({
+				s: { r: 2, c: 5 },
+				e: { r: 2, c: 8 }
+			});
 
-			for (var j = headerIndex + 1; j < rows.length; j++) {
-				if (!rows[j].length) continue;
-
-				html += '<tr>';
-
-				rows[j].forEach(function (cell) {
-					html += '<td>' + htmlEsc(cell) + '</td>';
+			// All other filter rows center: A to P
+			for (var r = 3; r < headerIndex - 1; r++) {
+				merges.push({
+					s: { r: r, c: 0 },
+					e: { r: r, c: 15 }
 				});
-
-				html += '</tr>';
 			}
 
-			html += '</tbody></table>';
+			ws["!merges"] = merges;
 
-			return html;
+			function styleCell(cellRef, isTitle) {
+				if (!ws[cellRef]) return;
+
+				ws[cellRef].s = {
+					alignment: {
+						horizontal: "center",
+						vertical: "center"
+					},
+					font: {
+						bold: true,
+						sz: isTitle ? 14 : 11
+					}
+				};
+			}
+
+			// Company
+			styleCell("A1", true);
+
+			// From Date + To Date
+			styleCell("F3", false);
+
+			// Other filters
+			for (var i = 4; i <= headerIndex; i++) {
+				styleCell("A" + i, false);
+			}
+
+			// Table header center and bold
+			for (var c = 0; c < 16; c++) {
+				var cellRef = XLSX.utils.encode_cell({ r: headerIndex, c: c });
+
+				if (ws[cellRef]) {
+					ws[cellRef].s = {
+						alignment: {
+							horizontal: "center",
+							vertical: "center"
+						},
+						font: {
+							bold: true
+						}
+					};
+				}
+			}
 		}
-
 		function printFlatExport() {
 			document.body.classList.add("print-flat");
 			document.getElementById("flat-print-export").innerHTML = buildFlatPrintHtml();
@@ -1447,6 +1511,8 @@ function po_open_detail_tab(items, po_names) {
 
 			var ws = XLSX.utils.aoa_to_sheet(rows);
 			var headerIndex = getHeaderIndex(rows);
+
+			applyExcelTopCenterStyle(ws, rows);
 
 			ws["!autofilter"] = {
 				ref: XLSX.utils.encode_range({
@@ -1501,8 +1567,48 @@ function po_open_detail_tab(items, po_names) {
 			a.click();
 			document.body.removeChild(a);
 		}
+          
+        function getDetailFilterLabel(value) {
+	if (!value) return "Detail Filter";
 
-		updateCount();
+	var search = String(value).toLowerCase().trim();
+
+	var isSupplier = false;
+	var isGroup = false;
+	var isItem = false;
+
+	EXPORT_ITEMS.forEach(function (it) {
+		var supplier = String(it.supplier || "").toLowerCase();
+		var itemGroup = String(it.item_group || "").toLowerCase();
+		var itemCode = String(it.item_code || "").toLowerCase();
+		var itemName = String(it.item_name || "").toLowerCase();
+
+		if (supplier && supplier.indexOf(search) !== -1) {
+			isSupplier = true;
+		}
+
+		if (itemGroup && itemGroup.indexOf(search) !== -1) {
+			isGroup = true;
+		}
+
+		if (
+			(itemCode && itemCode.indexOf(search) !== -1) ||
+			(itemName && itemName.indexOf(search) !== -1)
+		) {
+			isItem = true;
+		}
+	});
+
+	if (isSupplier) return "Supplier";
+	if (isGroup) return "Item Group";
+	if (isItem) return "Item";
+
+	return "Detail Filter";
+}
+
+		updateCount(); 
+
+
 	<\/script>
 </body>
 </html>

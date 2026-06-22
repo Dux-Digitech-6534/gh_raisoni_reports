@@ -207,7 +207,8 @@ function pr_open_detail_tab(items, receipt_names) {
 <html>
 <head>
 	<title>Purchase Receipt Item Details</title>
-	<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"><\/script>
+
+	<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"><\/script>
 
 	<style>
 		body {
@@ -375,8 +376,9 @@ function pr_open_detail_tab(items, receipt_names) {
 		.flat-export-title {
 			font-size: 14px;
 			font-weight: 700;
-			margin-bottom: 6px;
+			margin-bottom: 8px;
 			color: #000;
+			text-align: center;
 		}
 
 		.flat-export-filters {
@@ -384,6 +386,14 @@ function pr_open_detail_tab(items, receipt_names) {
 			margin-bottom: 8px;
 			font-weight: 600;
 			color: #000;
+			text-align: center;
+		}
+
+		.flat-export-filters .filter-line {
+			display: flex;
+			justify-content: center;
+			gap: 45px;
+			margin-bottom: 3px;
 		}
 
 		.col-no { width: 55px; }
@@ -462,13 +472,22 @@ function pr_open_detail_tab(items, receipt_names) {
 			body.print-flat .flat-export-title {
 				font-size: 13px !important;
 				font-weight: 700 !important;
-				margin-bottom: 4px !important;
+				margin-bottom: 5px !important;
+				text-align: center !important;
 			}
 
 			body.print-flat .flat-export-filters {
 				font-size: 8px !important;
 				margin-bottom: 6px !important;
 				font-weight: 600 !important;
+				text-align: center !important;
+			}
+
+			body.print-flat .flat-export-filters .filter-line {
+				display: flex !important;
+				justify-content: center !important;
+				gap: 35px !important;
+				margin-bottom: 3px !important;
 			}
 		}
 	</style>
@@ -578,53 +597,26 @@ function pr_open_detail_tab(items, receipt_names) {
 		}
 
 		function exportDate(value) {
-				if (!value) return "-";
+			if (!value) return "-";
 
-				var s = String(value);
+			var s = String(value);
 
-				if (s.indexOf(" ") !== -1) {
-					s = s.split(" ")[0];
+			if (s.indexOf(" ") !== -1) {
+				s = s.split(" ")[0];
+			}
+
+			if (s.indexOf("-") !== -1) {
+				var parts = s.split("-");
+				if (parts.length === 3) {
+					return parts[2] + "/" + parts[1] + "/" + parts[0];
 				}
+			}
 
-				if (s.indexOf("-") !== -1) {
-					var parts = s.split("-");
-					if (parts.length === 3) {
-						return parts[2] + "/" + parts[1] + "/" + parts[0];
-					}
-				}
-
-				if (s.indexOf("/") !== -1) {
-					return s;
-				}
-
+			if (s.indexOf("/") !== -1) {
 				return s;
 			}
 
-		function addFilterIfFilled(rows, label, value) {
-			if (
-				value !== undefined &&
-				value !== null &&
-				String(value).trim() !== "" &&
-				String(value).trim() !== "-"
-			) {
-				rows.push([label, value]);
-			}
-		}
-
-		function getFilterRows() {
-			var rows = [];
-
-			addFilterIfFilled(rows, "From Date", exportDate(EXPORT_FILTERS.from_date));
-            addFilterIfFilled(rows, "To Date", exportDate(EXPORT_FILTERS.to_date));
-			addFilterIfFilled(rows, "Company", EXPORT_FILTERS.company);
-			addFilterIfFilled(rows, "Supplier", EXPORT_FILTERS.supplier);
-			addFilterIfFilled(rows, "Status", EXPORT_FILTERS.status);
-
-			addFilterIfFilled(rows, "Purchase Receipt No", exportInputValue("filter-receipt"));
-			addFilterIfFilled(rows, "Purchase Order ID", exportInputValue("filter-po"));
-			addFilterIfFilled(rows, "Detail Item / Supplier / Group Filter", exportInputValue("filter-item"));
-
-			return rows;
+			return s;
 		}
 
 		function itemMatchesExportFilters(it) {
@@ -659,15 +651,51 @@ function pr_open_detail_tab(items, receipt_names) {
 
 		function buildFlatExportRows() {
 			var rows = [];
-			var filterRows = getFilterRows();
 
-			filterRows.forEach(function (r) {
-				rows.push(r);
-			});
+			var detailFilter = exportInputValue("filter-item");
+			var supplierValue = EXPORT_FILTERS.supplier || "";
 
-			if (filterRows.length) {
-				rows.push([]);
+			// Company center FIRST
+			rows.push([EXPORT_FILTERS.company || "-"]);
+			rows.push([]);
+
+			// From Date and To Date together in center
+			rows.push([
+				"",
+				"",
+				"",
+				"",
+				"",
+				"From Date : " + exportDate(EXPORT_FILTERS.from_date) + "     To Date : " + exportDate(EXPORT_FILTERS.to_date)
+			]);
+
+			// Main supplier filter only if selected
+			if (supplierValue && String(supplierValue).trim() !== "") {
+				rows.push(["Supplier : " + supplierValue]);
 			}
+
+			// Detail filter dynamic label: Supplier / Item Group / Item
+			if (detailFilter && String(detailFilter).trim() !== "") {
+				var detailLabel = getDetailFilterLabel(detailFilter);
+				rows.push([detailLabel + " : " + detailFilter]);
+			}
+
+			// Status only if selected
+			if (EXPORT_FILTERS.status && String(EXPORT_FILTERS.status).trim() !== "") {
+				rows.push(["Status : " + EXPORT_FILTERS.status]);
+			}
+
+			// Purchase Receipt No only if typed
+			if (exportInputValue("filter-receipt")) {
+				rows.push(["Purchase Receipt No : " + exportInputValue("filter-receipt")]);
+			}
+
+			// Purchase Order ID only if typed
+			if (exportInputValue("filter-po")) {
+				rows.push(["Purchase Order ID : " + exportInputValue("filter-po")]);
+			}
+
+			rows.push([]);
 
 			rows.push([
 				"Date",
@@ -713,10 +741,11 @@ function pr_open_detail_tab(items, receipt_names) {
 
 			return rows;
 		}
+			
 
 		function getHeaderIndex(rows) {
 			for (var i = 0; i < rows.length; i++) {
-				if (rows[i].length > 2) {
+				if (rows[i].length > 10 && rows[i][0] === "Date") {
 					return i;
 				}
 			}
@@ -725,19 +754,54 @@ function pr_open_detail_tab(items, receipt_names) {
 
 		function buildFlatPrintHtml() {
 			var rows = buildFlatExportRows();
-			var filterRows = getFilterRows();
 			var headerIndex = getHeaderIndex(rows);
 			var html = "";
 
-			html += '<div class="flat-export-title">Purchase Receipt Parent Child Export</div>';
+			var detailFilter = exportInputValue("filter-item");
+			var supplierValue = EXPORT_FILTERS.supplier || "";
 
-			if (filterRows.length) {
-				html += '<div class="flat-export-filters">';
-				filterRows.forEach(function (r) {
-					html += '<div><b>' + htmlEsc(r[0]) + ':</b> ' + htmlEsc(r[1]) + '</div>';
-				});
+			html += '<div class="flat-export-title">' + htmlEsc(EXPORT_FILTERS.company || "-") + '</div>';
+
+			html += '<div class="flat-export-filters">';
+
+			html += '<div class="filter-line">';
+			html += '<span><b>From Date:</b> ' + htmlEsc(exportDate(EXPORT_FILTERS.from_date)) + '</span>';
+			html += '<span><b>To Date:</b> ' + htmlEsc(exportDate(EXPORT_FILTERS.to_date)) + '</span>';
+			html += '</div>';
+
+			if (supplierValue && String(supplierValue).trim() !== "") {
+				html += '<div class="filter-line">';
+				html += '<span><b>Supplier:</b> ' + htmlEsc(supplierValue) + '</span>';
 				html += '</div>';
 			}
+
+			if (detailFilter && String(detailFilter).trim() !== "") {
+				var detailLabel = getDetailFilterLabel(detailFilter);
+
+				html += '<div class="filter-line">';
+				html += '<span><b>' + htmlEsc(detailLabel) + ':</b> ' + htmlEsc(detailFilter) + '</span>';
+				html += '</div>';
+			}
+
+			if (EXPORT_FILTERS.status && String(EXPORT_FILTERS.status).trim() !== "") {
+				html += '<div class="filter-line">';
+				html += '<span><b>Status:</b> ' + htmlEsc(EXPORT_FILTERS.status) + '</span>';
+				html += '</div>';
+			}
+
+			if (exportInputValue("filter-receipt")) {
+				html += '<div class="filter-line">';
+				html += '<span><b>Purchase Receipt No:</b> ' + htmlEsc(exportInputValue("filter-receipt")) + '</span>';
+				html += '</div>';
+			}
+
+			if (exportInputValue("filter-po")) {
+				html += '<div class="filter-line">';
+				html += '<span><b>Purchase Order ID:</b> ' + htmlEsc(exportInputValue("filter-po")) + '</span>';
+				html += '</div>';
+			}
+
+			html += '</div>';
 
 			html += '<table>';
 			html += '<thead><tr>';
@@ -779,12 +843,84 @@ function pr_open_detail_tab(items, receipt_names) {
 			}, 1500);
 		}
 
+		function applyExcelTopCenterStyle(ws, rows) {
+			var headerIndex = getHeaderIndex(rows);
+			var merges = [];
+
+			// Company full center: A to P
+			merges.push({
+				s: { r: 0, c: 0 },
+				e: { r: 0, c: 15 }
+			});
+
+			// From Date and To Date together: F to I
+			merges.push({
+				s: { r: 2, c: 5 },
+				e: { r: 2, c: 8 }
+			});
+
+			// Dynamic center rows after date row until before table header
+			for (var r = 3; r < headerIndex - 1; r++) {
+				merges.push({
+					s: { r: r, c: 0 },
+					e: { r: r, c: 15 }
+				});
+			}
+
+			ws["!merges"] = merges;
+
+			function styleCell(cellRef, isTitle) {
+				if (!ws[cellRef]) return;
+
+				ws[cellRef].s = {
+					alignment: {
+						horizontal: "center",
+						vertical: "center"
+					},
+					font: {
+						bold: true,
+						sz: isTitle ? 14 : 11
+					}
+				};
+			}
+
+			// Company
+			styleCell("A1", true);
+
+			// From Date and To Date
+			styleCell("F3", false);
+
+			// Other dynamic filter rows
+			for (var i = 4; i <= headerIndex; i++) {
+				styleCell("A" + i, false);
+			}
+
+			// Table header bold and center
+			for (var c = 0; c < 16; c++) {
+				var cellRef = XLSX.utils.encode_cell({ r: headerIndex, c: c });
+
+				if (ws[cellRef]) {
+					ws[cellRef].s = {
+						alignment: {
+							horizontal: "center",
+							vertical: "center"
+						},
+						font: {
+							bold: true
+						}
+					};
+				}
+			}
+		}
+
 		function downloadExcel() {
 			var rows = buildFlatExportRows();
 
 			if (typeof XLSX !== "undefined") {
 				var ws = XLSX.utils.aoa_to_sheet(rows);
 				var headerIndex = getHeaderIndex(rows);
+
+				applyExcelTopCenterStyle(ws, rows);
 
 				ws["!autofilter"] = {
 					ref: XLSX.utils.encode_range({
@@ -843,7 +979,43 @@ function pr_open_detail_tab(items, receipt_names) {
 			a.click();
 			document.body.removeChild(a);
 		}
+        function getDetailFilterLabel(value) {
+			if (!value) return "Detail Filter";
 
+			var search = String(value).toLowerCase().trim();
+
+			var isSupplier = false;
+			var isGroup = false;
+			var isItem = false;
+
+			EXPORT_ITEMS.forEach(function (it) {
+				var supplier = String(it.supplier || "").toLowerCase();
+				var itemGroup = String(it.item_group || "").toLowerCase();
+				var itemCode = String(it.item_code || "").toLowerCase();
+				var itemName = String(it.item_name || "").toLowerCase();
+
+				if (supplier && supplier.indexOf(search) !== -1) {
+					isSupplier = true;
+				}
+
+				if (itemGroup && itemGroup.indexOf(search) !== -1) {
+					isGroup = true;
+				}
+
+				if (
+					(itemCode && itemCode.indexOf(search) !== -1) ||
+					(itemName && itemName.indexOf(search) !== -1)
+				) {
+					isItem = true;
+				}
+			});
+
+			if (isSupplier) return "Supplier";
+			if (isGroup) return "Item Group";
+			if (isItem) return "Item";
+
+			return "Detail Filter";
+		}
 		updateCount();
 	<\/script>
 </body>

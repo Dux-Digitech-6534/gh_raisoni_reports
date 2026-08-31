@@ -125,27 +125,15 @@ function po_add_styles() {
 
 function po_read_checked(report) {
 	var dt = report.datatable;
-	if (!dt || !report.data) return;
+	if (!dt || !report.data || !dt.rowmanager) return;
 
 	var selected = {};
+	var indexes = dt.rowmanager.getCheckedRows() || [];
 
-	$(dt.wrapper).find(".dt-scrollable .dt-row").each(function () {
-		var $row = $(this);
+	indexes.forEach(function (row_idx) {
+		if (row_idx === undefined) return;
 
-		var is_checked =
-			$row.hasClass("dt-row--highlight") ||
-			$row.hasClass("dt-row--checked") ||
-			$row.find("input[type='checkbox']:checked").length > 0;
-
-		if (!is_checked) return;
-
-		var row_idx = parseInt($row.attr("data-row-index"), 10);
-
-		if (isNaN(row_idx)) {
-			row_idx = parseInt($row.find("[data-row-index]").first().attr("data-row-index"), 10);
-		}
-
-		var rd = report.data[row_idx] || report.data[row_idx - 1];
+		var rd = report.data[row_idx];
 
 		if (rd) {
 			var po_name = rd.name || rd.po_id || rd.purchase_order;

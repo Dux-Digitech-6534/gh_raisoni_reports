@@ -298,6 +298,7 @@ def get_receipt_item_details(receipt_names):
             pri.idx AS idx,
             pri.item_code AS item_code,
             pri.item_name AS item_name,
+            pri.description AS description,
             pri.item_group AS item_group,
             COALESCE(pri.received_qty, pri.qty, 0) AS qty,
             pri.uom AS uom,

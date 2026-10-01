@@ -1035,6 +1035,7 @@ function pr_make_item_table_for_new_tab(items) {
 		var expense_head = it.expense_head || "";
 		var item_code = it.item_code || "";
 		var item_name = it.item_name || item_code || "";
+		var description = it.description || "";
 		var item_group = it.item_group || "";
 		var qty = pr_fmt_num(it.qty);
 		var uom = it.uom || "";
@@ -1063,6 +1064,7 @@ function pr_make_item_table_for_new_tab(items) {
 						? '<a class="doc-link" href="/app/item/' + encodeURIComponent(item_code || item_name) + '" target="_blank">' + pr_esc(item_name) + '</a>'
 						: '<span class="muted">-</span>') +
 				'</td>' +
+				'<td class="col-description" title="' + pr_esc(description) + '">' + (description ? pr_esc(description) : '<span class="muted">-</span>') + '</td>' +
 				'<td class="col-group" title="' + pr_esc(item_group) + '">' +
 					(item_group
 						? '<a class="doc-link" href="/app/item-group/' + encodeURIComponent(item_group) + '" target="_blank">' + pr_esc(item_group) + '</a>'
@@ -1085,6 +1087,7 @@ function pr_make_item_table_for_new_tab(items) {
 					'<th class="col-pi">Purchase Invoice ID</th>' +
 					'<th class="col-expense">Expense Head</th>' +
 					'<th class="col-item">Item Name</th>' +
+					'<th class="col-description">Item Description</th>' +
 					'<th class="col-group">Item Group</th>' +
 					'<th class="text-right col-qty">Quantity</th>' +
 					'<th class="col-uom">UOM</th>' +

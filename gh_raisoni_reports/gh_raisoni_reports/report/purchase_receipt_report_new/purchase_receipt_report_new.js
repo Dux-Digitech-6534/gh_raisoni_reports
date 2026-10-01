@@ -390,6 +390,13 @@ function pr_open_detail_tab(items, receipt_names) {
 		.col-pi { width: 190px; }
 		.col-expense { width: 190px; }
 		.col-item { width: 170px; }
+			.col-description {
+				width: 220px;
+				white-space: normal;
+				overflow: visible;
+				text-overflow: unset;
+				word-break: break-word;
+			}
 		.col-group { width: 120px; }
 		.col-qty { width: 100px; }
 		.col-uom { width: 80px; }

@@ -1042,7 +1042,7 @@ function pr_make_item_table_for_new_tab(items) {
 		var expense_head = it.expense_head || "";
 		var item_code = it.item_code || "";
 		var item_name = it.item_name || item_code || "";
-		var description = it.description || "";
+		var description = pr_strip_html(it.description || "");
 		var item_group = it.item_group || "";
 		var qty = pr_fmt_num(it.qty);
 		var uom = it.uom || "";
@@ -1134,6 +1134,13 @@ function pr_make_multi_link(route, value) {
 			pr_esc(v) +
 		'</a>';
 	}).join(", ");
+}
+
+function pr_strip_html(html) {
+	if (!html) return "";
+	var spaced = String(html).replace(/<\/(p|div|li|tr)>|<br\s*\/?>/gi, " ");
+	var text = new DOMParser().parseFromString(spaced, "text/html").body.textContent || "";
+	return text.replace(/\s+/g, " ").trim();
 }
 
 function pr_esc(value) {

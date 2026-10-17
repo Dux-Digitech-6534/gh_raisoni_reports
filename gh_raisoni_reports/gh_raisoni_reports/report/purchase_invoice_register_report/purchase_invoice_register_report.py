@@ -286,21 +286,23 @@ def _get_invoice_items(names):
 def _get_item_taxes(names, items):
     """{item row name: (tax %, tax amount)} from the invoice's Taxes and Charges table.
 
-    item_wise_tax_detail is keyed by item code, so an item code that appears on
-    several rows is split between them by net amount. Each tax row's shares are
-    scaled to its base amount after discount, so the item tax amounts add up to
-    the invoice's taxes in company currency.
+    Each tax row's item shares are scaled to its base amount after discount, so
+    the item tax amounts add up to the invoice's taxes in company currency.
     """
     if not names:
         return {}
+
+    # ERPNext v15 keeps the item split as JSON on the tax row; v16 moved it to
+    # the Item Wise Tax Detail child table
+    legacy = frappe.db.has_column("Purchase Taxes and Charges", "item_wise_tax_detail")
     taxes = frappe.db.sql(
         """
-        SELECT parent, charge_type, rate, add_deduct_tax, category, item_wise_tax_detail,
-            base_tax_amount_after_discount_amount AS base_amount
+        SELECT name, parent, charge_type, rate, add_deduct_tax, category,
+            base_tax_amount_after_discount_amount AS base_amount{legacy_col}
         FROM `tabPurchase Taxes and Charges`
         WHERE parent IN %(names)s AND parenttype = 'Purchase Invoice'
         ORDER BY parent, idx
-        """,
+        """.format(legacy_col=", item_wise_tax_detail" if legacy else ""),
         {"names": tuple(names)},
         as_dict=True,
     )
@@ -308,6 +310,8 @@ def _get_item_taxes(names, items):
     rows_by_invoice = {}
     for it in items:
         rows_by_invoice.setdefault(it.parent, []).append(it)
+
+    split = {} if legacy else _get_item_wise_tax_details(names)
 
     result = {it.name: [0.0, 0.0] for it in items}
     for tax in taxes:
@@ -319,23 +323,15 @@ def _get_item_taxes(names, items):
             continue
         sign = -1 if tax.add_deduct_tax == "Deduct" else 1
 
-        try:
-            detail = json.loads(tax.item_wise_tax_detail or "{}") or {}
-        except ValueError:
-            detail = {}
-
-        code_net = {}
-        for it in rows:
-            code_net[it.item_code] = code_net.get(it.item_code, 0) + flt(it.base_net_amount)
+        # {item row name: (rate, amount)}
+        detail = _split_legacy_detail(tax.item_wise_tax_detail, rows) if legacy else split.get(tax.name, {})
 
         weights = {}
         rates = {}
         for it in rows:
-            share_of_code = flt(it.base_net_amount) / code_net[it.item_code] if code_net[it.item_code] else 0
-            d = detail.get(it.item_code)
-            if isinstance(d, (list, tuple)) and len(d) > 1:
-                weights[it.name] = flt(d[1]) * share_of_code
-                rates[it.name] = flt(d[0])
+            d = detail.get(it.name)
+            if d:
+                rates[it.name], weights[it.name] = d
             else:
                 weights[it.name] = 0
                 rates[it.name] = 0 if tax.charge_type == "Actual" else flt(tax.rate)
@@ -352,6 +348,48 @@ def _get_item_taxes(names, items):
                 result[it.name][1] += sign * flt(tax.base_amount) * weights[it.name] / total_weight
 
     return {k: (v[0], v[1]) for k, v in result.items()}
+
+
+def _split_legacy_detail(raw, rows):
+    """v15 item_wise_tax_detail is keyed by item code; an item code that appears
+    on several rows is split between them by net amount."""
+    try:
+        detail = json.loads(raw or "{}") or {}
+    except ValueError:
+        return {}
+
+    code_net = {}
+    for it in rows:
+        code_net[it.item_code] = code_net.get(it.item_code, 0) + flt(it.base_net_amount)
+
+    out = {}
+    for it in rows:
+        d = detail.get(it.item_code)
+        if isinstance(d, (list, tuple)) and len(d) > 1:
+            share_of_code = flt(it.base_net_amount) / code_net[it.item_code] if code_net[it.item_code] else 0
+            out[it.name] = (flt(d[0]), flt(d[1]) * share_of_code)
+    return out
+
+
+def _get_item_wise_tax_details(names):
+    """v16: {tax row name: {item row name: (rate, amount)}}"""
+    if not frappe.db.table_exists("Item Wise Tax Detail"):
+        return {}
+    rows = frappe.db.sql(
+        """
+        SELECT tax_row, item_row, SUM(rate) AS rate, SUM(amount) AS amount
+        FROM `tabItem Wise Tax Detail`
+        WHERE parent IN %(names)s AND parenttype = 'Purchase Invoice'
+        GROUP BY tax_row, item_row
+        """,
+        {"names": tuple(names)},
+        as_dict=True,
+    )
+    out = {}
+    for r in rows:
+        out.setdefault(r.tax_row, {})[r.item_row] = (flt(r.rate), flt(r.amount))
+    return out
+
 
 
 def _get_gl_heads(names):
